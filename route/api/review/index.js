@@ -1,10 +1,13 @@
 const express = require('express');
-const { addreviewContaroller } = require('../../../controllers/review.controller');
+const { addreviewContaroller, productReviewsController, allReviewsController } = require('../../../controllers/review.controller');
+const { validAuthorize } = require('../../../middleware/validAuthorize');
 const router = express.Router();
 
 
 
-router.post("/add-review",addreviewContaroller)
+router.get("/product/:productId", productReviewsController)
+router.get("/all", allReviewsController)
+router.post("/add-review", validAuthorize, addreviewContaroller)
 
 
 

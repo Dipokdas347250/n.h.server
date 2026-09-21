@@ -55,27 +55,23 @@ exports.updateCategoryController = asyncHandler(async (req, res, next) => {
     let filename = req.file?.filename;
     if (req.file) {
         let categoryImage = await categoreModel.findOne({ _id: id })
+        if (!categoryImage) return apiResponse(res, 404, "category not found");
         let filepath = categoryImage.image.split("/")
         let imagepath = filepath[filepath.length - 1]
 
         let oldpath = path.join(__dirname, "../uploads")
-        fs.unlink(`${oldpath}/${imagepath}`, async (err) => {
-            if (err) {
-                apiResponse(res, 500, err.message);
-
-            } else {
-                let image = `${process.env.SERVER_URL}/${filename}`;
-                categoryImage.image = image;
-                await categoryImage.save();
-                apiResponse(res, 200, "category updateed")
-
-            }
-        })
+        fs.unlink(`${oldpath}/${imagepath}`, () => {})
+        categoryImage.name = name;
+        categoryImage.discount = discount;
+        categoryImage.slug = slugify(name, { replacement: "-", lower: true, trim: true });
+        categoryImage.image = `${process.env.SERVER_URL}/${filename}`;
+        await categoryImage.save();
+        apiResponse(res, 200, "category updated", categoryImage)
 
 
     } else {
-        let update = await categoreModel.findOneAndUpdate({ _id: id }, { name, discount }, { new: true })
-        apiResponse(res, 200, "category updateed", update)
+        let update = await categoreModel.findOneAndUpdate({ _id: id }, { name, discount, slug: slugify(name, { replacement: "-", lower: true, trim: true }) }, { new: true })
+        apiResponse(res, 200, "category updated", update)
     }
 
 });
