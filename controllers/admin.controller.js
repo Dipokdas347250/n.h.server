@@ -8,8 +8,20 @@ const visitModel = require("../models/visit.model");
 
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+exports.getTopSellingProducts = async (limit = 8) => orderModel.aggregate([
+  { $unwind: "$items" },
+  { $group: { _id: "$items.product", sold: { $sum: { $ifNull: ["$items.quntity", 1] } } } },
+  { $sort: { sold: -1 } },
+  { $limit: limit },
+  { $lookup: { from: "products", localField: "_id", foreignField: "_id", as: "product" } },
+  { $unwind: "$product" },
+  { $lookup: { from: categoryModel.collection.name, localField: "product.category", foreignField: "_id", as: "category" } },
+  { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+  { $replaceRoot: { newRoot: { $mergeObjects: ["$product", { sold: "$sold", category: "$category" }] } } },
+]);
+
 exports.dashboardController = asyncHandler(async (req, res) => {
-  const [orders, users, products, categories, revenueTrend, orderOverview, recentOrders, uniqueVisitors] = await Promise.all([
+  const [orders, users, products, categories, revenueTrend, orderOverview, recentOrders, uniqueVisitors, topSelling] = await Promise.all([
     orderModel.countDocuments(),
     userModel.countDocuments(),
     productModel.countDocuments(),
@@ -22,6 +34,7 @@ exports.dashboardController = asyncHandler(async (req, res) => {
     orderModel.aggregate([{ $group: { _id: "$deliveryStatus", count: { $sum: 1 } } }]),
     orderModel.find({}).sort({ createdAt: -1 }).limit(8).populate("user", "fullname email").select("user totalprice paymentStatus deliveryStatus createdAt transaction_id"),
     visitModel.distinct("visitorKey"),
+    exports.getTopSellingProducts(8),
   ]);
 
   const revenue = await orderModel.aggregate([{ $group: { _id: null, total: { $sum: "$totalprice" } } }]);
@@ -40,6 +53,7 @@ exports.dashboardController = asyncHandler(async (req, res) => {
     revenueTrend: trend,
     orderOverview: orderOverview.map((item) => ({ status: item._id || "unknown", count: item.count })),
     recentOrders,
+    topSelling,
     generatedAt: now,
   });
 });

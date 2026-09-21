@@ -64,7 +64,7 @@ exports.singleCartController = asyncHandler(async(req, res)=>{
 
    let getCartlist = await cartModel.find({user}).populate({
       path:"product",
-      select: "title price image"
+      select: "title price image diccountprice"
    }).populate({
      path:"variant", 
    }).populate({
@@ -74,3 +74,21 @@ exports.singleCartController = asyncHandler(async(req, res)=>{
    .select(" -updatedAt -createdAt")
    apiResponse(res, 200 , "single cart fatch ...",getCartlist)
 })
+
+exports.removeCartController = asyncHandler(async (req, res) => {
+   const { product, variant } = req.body;
+   await cartModel.findOneAndDelete({ user: req.session.user._id, product, ...(variant ? { variant } : { $or: [{ variant: null }, { variant: { $exists: false } }] }) });
+   apiResponse(res, 200, "cart item removed");
+});
+
+exports.updateCartController = asyncHandler(async (req, res) => {
+   const { product, variant, quntity } = req.body;
+   const quantity = Number(quntity);
+   if (!Number.isInteger(quantity) || quantity < 1) return apiResponse(res, 400, "Quantity must be at least 1");
+   const cartItem = await cartModel.findOne({ user: req.session.user._id, product, ...(variant ? { variant } : { $or: [{ variant: null }, { variant: { $exists: false } }] }) }).populate("product", "price diccountprice");
+   if (!cartItem) return apiResponse(res, 404, "cart item not found");
+   cartItem.quntity = quantity;
+   cartItem.totalprice = Number(cartItem.product.diccountprice || cartItem.product.price) * quantity;
+   await cartItem.save();
+   apiResponse(res, 200, "cart quantity updated", cartItem);
+});
