@@ -6,6 +6,7 @@ const { v4 } = require("uuid")
 const userModel = require("../models/user.model");
 const productModel = require("../models/product.model");
 
+const getProductPrice = (product) => Number(product.discountPrice ?? product.diccountprice ?? product.price);
 
 const SSLCommerzPayment = require('sslcommerz-lts')
 const store_id = process.env.STORE_ID
@@ -42,7 +43,7 @@ exports.checkoutController = asyncHandler(async (req, res) => {
         cartItems = products.map((product) => {
             const requested = items.find((item) => String(item.product) === String(product._id));
             const quantity = Number(requested?.quantity || requested?.quntity || 1);
-            return { product: product._id, variant: requested?.variant, quntity: quantity, totalprice: product.price * quantity };
+            return { product: product._id, variant: requested?.variant, quntity: quantity, totalprice: getProductPrice(product) * quantity };
         });
     } else {
         const cart = await cartModel.find({ user: user._id }).populate({ path: "product" });
@@ -50,7 +51,7 @@ exports.checkoutController = asyncHandler(async (req, res) => {
             product: item.product._id,
             variant: item.variant,
             quntity: item.quntity || 1,
-            totalprice: item.product.price * (item.quntity || 1),
+            totalprice: getProductPrice(item.product) * (item.quntity || 1),
         }));
     }
     if (!cartItems.length) return apiResponse(res, 400, "Your cart is empty");

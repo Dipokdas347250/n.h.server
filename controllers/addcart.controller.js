@@ -3,6 +3,8 @@ const productModel = require("../models/product.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 
+const getProductPrice = (product) => Number(product.discountPrice ?? product.diccountprice ?? product.price);
+
 exports.addCartController = asyncHandler(async(req ,res)=>{
     
     let {variant,quntity,product}= req.body;
@@ -14,14 +16,14 @@ exports.addCartController = asyncHandler(async(req ,res)=>{
 
     if(cartData){
       cartData.quntity++;
-      cartData.totalprice = cartData.product.price * cartData.quntity;
+      cartData.totalprice = getProductPrice(cartData.product) * cartData.quntity;
       await cartData.save()
       apiResponse(res ,200, "quntity updated")
 
     }else{
 
        let productData = await productModel.findOne({_id:product})
-       let totalprice = productData.price * (quntity ? quntity: 1);
+       let totalprice = getProductPrice(productData) * (quntity ? quntity: 1);
    
    
    
@@ -64,7 +66,7 @@ exports.singleCartController = asyncHandler(async(req, res)=>{
 
    let getCartlist = await cartModel.find({user}).populate({
       path:"product",
-      select: "title price image diccountprice"
+      select: "title price discountPrice diccountprice image"
    }).populate({
      path:"variant", 
    }).populate({
@@ -85,10 +87,10 @@ exports.updateCartController = asyncHandler(async (req, res) => {
    const { product, variant, quntity } = req.body;
    const quantity = Number(quntity);
    if (!Number.isInteger(quantity) || quantity < 1) return apiResponse(res, 400, "Quantity must be at least 1");
-   const cartItem = await cartModel.findOne({ user: req.session.user._id, product, ...(variant ? { variant } : { $or: [{ variant: null }, { variant: { $exists: false } }] }) }).populate("product", "price diccountprice");
+   const cartItem = await cartModel.findOne({ user: req.session.user._id, product, ...(variant ? { variant } : { $or: [{ variant: null }, { variant: { $exists: false } }] }) }).populate("product", "price discountPrice diccountprice");
    if (!cartItem) return apiResponse(res, 404, "cart item not found");
    cartItem.quntity = quantity;
-   cartItem.totalprice = Number(cartItem.product.diccountprice || cartItem.product.price) * quantity;
+   cartItem.totalprice = getProductPrice(cartItem.product) * quantity;
    await cartItem.save();
    apiResponse(res, 200, "cart quantity updated", cartItem);
 });
