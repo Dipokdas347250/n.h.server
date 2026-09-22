@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema(
     {
     title:{
         type:String,
-        require: [true,"title is required"],
+        required: [true,"title is required"],
           trim: true
     },
     sku:{
@@ -17,17 +17,28 @@ const productSchema = new mongoose.Schema(
     },
     description:{
          type:String,
-         require: [true,"description is required"],
-
+         required: [true,"description is required"],
+         trim: true
     },
     image:[String ],
     price:{
         type:Number,
-        require: [true,"title is price"],
+        required: [true,"price is required"],
+        min: 0
     },
+    discountPrice:{
+        type:Number,
+        min: 0
+    },
+    // Kept for existing records and older cart documents.
     diccountprice:{
         type:Number,
-        
+        min: 0
+    },
+    offer:{
+        type:String,
+        trim: true,
+        default: ""
     },
    category: {
         type: mongoose.Types.ObjectId,

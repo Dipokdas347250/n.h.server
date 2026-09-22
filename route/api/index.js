@@ -11,6 +11,7 @@ const review = require('./review')
 const cart = require('./cart')
 const checkout = require('./checkout')
 const admin = require('./admin')
+const video = require('./video')
 
 
 
@@ -27,5 +28,6 @@ router.use("/review", review)
 router.use("/cart", cart)
 router.use("/checkout", checkout)
 router.use("/admin", admin)
+router.use("/video", video)
 
 module.exports = router;

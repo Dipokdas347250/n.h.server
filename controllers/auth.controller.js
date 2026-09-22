@@ -97,7 +97,7 @@ exports.loginController = asyncHandler(async(req,res)=>{
               };
 
               if(loginUser.role == "admin" || loginUser.role == "subadmin"){
-                req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 1 day
+                req.session.cookie.maxAge = 24 * 7 * 60 * 60 * 1000; // 7 day
                  req.session.user = user;
               }else{
                 req.session.cookie.maxAge = 24 * 7 * 60 * 60 * 1000; // 7 days

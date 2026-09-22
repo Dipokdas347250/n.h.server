@@ -19,6 +19,17 @@ const uploadProductImages = async (files = []) => Promise.all(files.map(async (f
 exports.allMainProductController = asyncHandler(async (req, res) => {
   const category = await categoryModel.findById(req.body.category);
   if (!category) return apiResponse(res, 400, "A valid category is required");
+  const title = String(req.body.title || "").trim();
+  const description = String(req.body.description || "").trim();
+  const price = Number(req.body.price);
+  const discountPrice = req.body.discountPrice === "" || req.body.discountPrice === undefined
+    ? undefined
+    : Number(req.body.discountPrice);
+  if (!title || !description) return apiResponse(res, 400, "Title and description are required");
+  if (!Number.isFinite(price) || price < 0) return apiResponse(res, 400, "A valid price is required");
+  if (discountPrice !== undefined && (!Number.isFinite(discountPrice) || discountPrice < 0 || discountPrice > price)) {
+    return apiResponse(res, 400, "Offer price must be between 0 and the regular price");
+  }
 
   const filenames = await uploadProductImages(req.files);
   let slug = slugify(req.body.title, {
@@ -35,7 +46,12 @@ exports.allMainProductController = asyncHandler(async (req, res) => {
   }
 
   let products = new productModel({
-    ...req.body,
+    title,
+    description,
+    price,
+    discountPrice,
+    offer: String(req.body.offer || "").trim(),
+    sku: String(req.body.sku || "").trim(),
     category: category._id,
     variantType: variantInput.length ? "multivariant" : "singlevariant",
     image: filenames,
@@ -78,13 +94,25 @@ exports.updateProductController = asyncHandler(async (req, res) => {
   const product = await productModel.findById(req.params.id);
   if (!product) return apiResponse(res, 404, "product not found");
 
-  const { title, description, price, sku } = req.body;
+  const { title, description, price, discountPrice, offer, sku } = req.body;
   if (title !== undefined) {
     product.title = title;
     product.slug = slugify(title, { replacement: "-", lower: true, trim: true });
   }
-  if (description !== undefined) product.description = description;
-  if (price !== undefined) product.price = price;
+  if (description !== undefined) product.description = String(description).trim();
+  if (price !== undefined) {
+    const parsedPrice = Number(price);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return apiResponse(res, 400, "A valid price is required");
+    product.price = parsedPrice;
+  }
+  if (discountPrice !== undefined) {
+    const parsedDiscountPrice = discountPrice === "" ? undefined : Number(discountPrice);
+    if (parsedDiscountPrice !== undefined && (!Number.isFinite(parsedDiscountPrice) || parsedDiscountPrice < 0 || parsedDiscountPrice > product.price)) {
+      return apiResponse(res, 400, "Offer price must be between 0 and the regular price");
+    }
+    product.discountPrice = parsedDiscountPrice;
+  }
+  if (offer !== undefined) product.offer = String(offer).trim();
   if (sku !== undefined) product.sku = sku;
   if (req.files?.length) product.image = await uploadProductImages(req.files);
 

@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 //     cb('Error: Images only! (jpeg, jpg, png, gif)');
 //   }
 // }
-const fileFilter = (req, file, cb) => {
+const imageFileFilter = (req, file, cb) => {
   if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
     cb(null, true);
   } else {
@@ -31,10 +31,19 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+const videoFileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('video/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type, only video files are allowed!'), false);
+  }
+};
 
 
 // const upload = multer({ storage: storage, limits:{fileSize: 1024 * 1024 * 5}, fileFilter: function (req, file, cb) {
 //     checkFileType(file, cb);
 //   }});
-const upload = multer({ storage: storage, limits:{fileSize: 1024 * 1024 * 5}, fileFilter: fileFilter });
+const upload = multer({ storage, limits: { fileSize: 1024 * 1024 * 5 }, fileFilter: imageFileFilter });
+const videoUpload = multer({ storage, limits: { fileSize: 1024 * 1024 * 100 }, fileFilter: videoFileFilter });
 module.exports = upload;
+module.exports.videoUpload = videoUpload;
