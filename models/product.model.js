@@ -20,7 +20,9 @@ const productSchema = new mongoose.Schema(
          required: [true,"description is required"],
          trim: true
     },
-    image:[String ],
+    image:[String],
+    // Cloudinary public ids, kept so deletes can clean the remote gallery up.
+    imageIds:[String],
     price:{
         type:Number,
         required: [true,"price is required"],

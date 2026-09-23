@@ -2,7 +2,10 @@ const {default: mongoose} = require('mongoose');
 
 const subadminSchema = new mongoose.Schema({
     user:{
-        type: mongoose.Schema.Types.ObjectId
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: [true, 'user is required'],
+        unique: true
     },
 
     storename: {
@@ -12,8 +15,7 @@ const subadminSchema = new mongoose.Schema({
     },
     logo:{
          type: String,
-         ref: "User"
-
+         default: ""
     },
     phone:{
         type: String,

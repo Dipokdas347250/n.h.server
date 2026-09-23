@@ -1,21 +1,29 @@
+const multer = require("multer");
 const { apiResponse } = require("./apiResponse");
+const messages = require("./messages");
 
+/** Last stop for anything thrown in a controller: one bilingual JSON shape. */
 exports.globalerrorhandler = (error, req, res, next) => {
-    
-     if (error.name === 'ValidationError') {
-    let errors = {};
-    Object.keys(error.errors).forEach((key) => {
-      errors[key] = error.errors[key].message;
-    });
-    // return res.status(400).json({success:false,message:errors}); 
-     apiResponse(res,400,Object.values(errors)[0])
-  }else if(error.message){
-    apiResponse(res,500,error.message)
-  //  return res.status(500).json({success:false, message:error.message})
-  }else{
-     apiResponse(res,500,"Something went wrong")
-    // return res.status(500).json({success:false, message:"Something went wrong"})
-  }
-  
+  if (res.headersSent) return next(error);
 
-}
+  if (error.name === "ValidationError") {
+    const first = Object.values(error.errors)[0];
+    return apiResponse(res, 400, first?.message || messages.somethingWentWrong.en);
+  }
+
+  if (error.name === "CastError") {
+    return apiResponse(res, 400, { en: `Invalid value for ${error.path}`, bn: `${error.path} এর মানটি সঠিক নয়` });
+  }
+
+  // Duplicate key, e.g. registering an email that already exists.
+  if (error.code === 11000) {
+    return apiResponse(res, 409, messages.emailInUse);
+  }
+
+  if (error instanceof multer.MulterError) {
+    return apiResponse(res, 400, error.code === "LIMIT_FILE_SIZE" ? messages.fileTooLarge : messages.invalidFileType);
+  }
+
+  console.error("Unhandled error:", error);
+  return apiResponse(res, error.statusCode || 500, error.message || messages.somethingWentWrong);
+};

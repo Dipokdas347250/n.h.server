@@ -4,6 +4,7 @@ const videoModel = require("../models/video.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const cloudinary = require("../utils/cloudinary");
+const messages = require("../utils/messages");
 
 const removeLocalFile = async (filename) => {
   if (!filename) return;
@@ -11,12 +12,12 @@ const removeLocalFile = async (filename) => {
 };
 
 exports.addVideoController = asyncHandler(async (req, res) => {
-  if (!req.file) return apiResponse(res, 400, "video is required");
+  if (!req.file) return apiResponse(res, 400, messages.videoRequired);
 
-  const { title, description } = req.body;
+  const { title, description, titleBn, descriptionBn } = req.body;
   if (!title?.trim()) {
     await removeLocalFile(req.file.filename);
-    return apiResponse(res, 400, "title is required");
+    return apiResponse(res, 400, messages.titleRequired);
   }
 
   const uploadResult = await cloudinary.uploader.upload(req.file.path, {
@@ -28,21 +29,23 @@ exports.addVideoController = asyncHandler(async (req, res) => {
   const video = await videoModel.create({
     title: title.trim(),
     description: description?.trim() || "",
+    titleBn: titleBn?.trim() || "",
+    descriptionBn: descriptionBn?.trim() || "",
     video: uploadResult.secure_url || uploadResult.url,
     uploadResultId: uploadResult.public_id,
   });
 
-  return apiResponse(res, 201, "video created successfully", video);
+  return apiResponse(res, 201, messages.videoCreated, video);
 });
 
 exports.allVideoController = asyncHandler(async (req, res) => {
   const videos = await videoModel.find({ isPublished: true }).sort({ createdAt: -1 });
-  return apiResponse(res, 200, "all videos fetched successfully", videos);
+  return apiResponse(res, 200, messages.videosFetched, videos);
 });
 
 exports.allVideoAdminController = asyncHandler(async (req, res) => {
   const videos = await videoModel.find({}).sort({ createdAt: -1 });
-  return apiResponse(res, 200, "all videos fetched successfully", videos);
+  return apiResponse(res, 200, messages.videosFetched, videos);
 });
 
 exports.updateVideoController = asyncHandler(async (req, res) => {
@@ -50,18 +53,20 @@ exports.updateVideoController = asyncHandler(async (req, res) => {
   const updates = {};
   if (typeof req.body.title === "string") updates.title = req.body.title.trim();
   if (typeof req.body.description === "string") updates.description = req.body.description.trim();
+  if (typeof req.body.titleBn === "string") updates.titleBn = req.body.titleBn.trim();
+  if (typeof req.body.descriptionBn === "string") updates.descriptionBn = req.body.descriptionBn.trim();
   if (typeof req.body.isPublished !== "undefined") updates.isPublished = req.body.isPublished === true || req.body.isPublished === "true";
 
   const video = await videoModel.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
-  if (!video) return apiResponse(res, 404, "video not found");
-  return apiResponse(res, 200, "video updated successfully", video);
+  if (!video) return apiResponse(res, 404, messages.videoNotFound);
+  return apiResponse(res, 200, messages.videoUpdated, video);
 });
 
 exports.deleteVideoController = asyncHandler(async (req, res) => {
   const video = await videoModel.findByIdAndDelete(req.params.id);
-  if (!video) return apiResponse(res, 404, "video not found");
+  if (!video) return apiResponse(res, 404, messages.videoNotFound);
   if (video.uploadResultId) {
     await cloudinary.uploader.destroy(video.uploadResultId, { resource_type: "video" });
   }
-  return apiResponse(res, 200, "video deleted successfully");
+  return apiResponse(res, 200, messages.videoDeleted);
 });

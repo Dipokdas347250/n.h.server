@@ -1,57 +1,68 @@
+const fs = require("fs");
 const bannerModel = require("../models/banner.model");
+const cloudinary = require("../utils/cloudinary");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-const cloudinary = require("../utils/cloudinary");
-const path = require("path");
-const fs = require("fs");
+const messages = require("../utils/messages");
 
-exports.addBannerController = asyncHandler(async (req, res, next) => {
-    if (!req.file) return apiResponse(res, 400, "banner image is required");
-    let { filename } = req.file;
-    let { url } = req.body;
-    const uploadResult = await cloudinary.uploader
-        .upload(
-            req.file.path
-        )
-        .catch((error) => {
-            console.log(error);
-        });
-    let imagepath = path.join(__dirname, "../uploads")
-    fs.unlink(`${imagepath}/${filename}`, async (err) => {
-        if (err) {
-            apiResponse(res, 500, err.message);
-        }
-    })
-
-    let banner = new bannerModel({
-        image: uploadResult.url,
-        url,
-        uploadResultId: uploadResult.public_id
-    })
-
-    await banner.save()
-    apiResponse(res, 201, "banner created successffull", banner)
-
+/** Banners carry their own headline text in both languages. */
+const textFields = (body) => ({
+  title: String(body.title || "").trim(),
+  titleBn: String(body.titleBn || "").trim(),
+  subtitle: String(body.subtitle || "").trim(),
+  subtitleBn: String(body.subtitleBn || "").trim(),
+  description: String(body.description || "").trim(),
+  descriptionBn: String(body.descriptionBn || "").trim(),
+  buttonLabel: String(body.buttonLabel || "").trim(),
+  buttonLabelBn: String(body.buttonLabelBn || "").trim(),
 });
 
-exports.allBannerController = asyncHandler(async (req, res, next) => {
-    let banner = await bannerModel.find({})
-    apiResponse(res, 200, "all banner fatch successfull", banner)
+exports.addBannerController = asyncHandler(async (req, res) => {
+  if (!req.file) return apiResponse(res, 400, messages.bannerImageRequired);
 
+  const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "nh-shop/banners" });
+  fs.unlink(req.file.path, () => {});
+
+  const banner = await bannerModel.create({
+    image: uploadResult.secure_url || uploadResult.url,
+    uploadResultId: uploadResult.public_id,
+    url: String(req.body.url || "").trim(),
+    ...textFields(req.body),
+  });
+
+  apiResponse(res, 201, messages.bannerCreated, banner);
 });
 
-exports.updateBannerController = asyncHandler(async (req, res, next) => {
-    const { id, url } = req.body;
-    const banner = await bannerModel.findByIdAndUpdate(id, { url }, { new: true });
-    if (!banner) return apiResponse(res, 404, "banner not found");
-    apiResponse(res, 200, "banner updated successfully", banner);
+exports.allBannerController = asyncHandler(async (req, res) => {
+  const banners = await bannerModel.find({}).sort({ createdAt: -1 });
+  apiResponse(res, 200, messages.bannersFetched, banners);
 });
 
-exports.deleteBannerController = asyncHandler(async (req, res, next) => {
-    let { id } = req.params;
-    let bannerDelete = await bannerModel.findOneAndDelete({ _id: id })
-    if (!bannerDelete) return apiResponse(res, 404, "banner not found");
-    if (bannerDelete.uploadResultId) await cloudinary.uploader.destroy(bannerDelete.uploadResultId)
+exports.updateBannerController = asyncHandler(async (req, res) => {
+  const id = req.params.id || req.body.id;
+  const banner = await bannerModel.findById(id);
+  if (!banner) return apiResponse(res, 404, messages.bannerNotFound);
 
-    apiResponse(res, 200, "banner deleted successfully");
-})
+  if (req.body.url !== undefined) banner.url = String(req.body.url).trim();
+  Object.entries(textFields(req.body)).forEach(([key, value]) => {
+    if (req.body[key] !== undefined) banner[key] = value;
+  });
+
+  if (req.file) {
+    if (banner.uploadResultId) await cloudinary.uploader.destroy(banner.uploadResultId).catch(() => {});
+    const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "nh-shop/banners" });
+    fs.unlink(req.file.path, () => {});
+    banner.image = uploadResult.secure_url || uploadResult.url;
+    banner.uploadResultId = uploadResult.public_id;
+  }
+
+  await banner.save();
+  apiResponse(res, 200, messages.bannerUpdated, banner);
+});
+
+exports.deleteBannerController = asyncHandler(async (req, res) => {
+  const banner = await bannerModel.findByIdAndDelete(req.params.id);
+  if (!banner) return apiResponse(res, 404, messages.bannerNotFound);
+  if (banner.uploadResultId) await cloudinary.uploader.destroy(banner.uploadResultId).catch(() => {});
+  apiResponse(res, 200, messages.bannerDeleted);
+});

@@ -12,6 +12,9 @@ const videoSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    // Optional Bangla copy; the storefront falls back to the English text.
+    titleBn: { type: String, trim: true, default: "" },
+    descriptionBn: { type: String, trim: true, default: "" },
     video: {
       type: String,
       required: [true, "video is required"],

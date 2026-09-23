@@ -1,5 +1,2 @@
-exports.vaildEmail=(email)=>{
-   return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)
-    //  apiResponse(res,400,"invaild Email")
- 
-}
+/** Loose but practical email check used before hitting the database. */
+exports.vaildEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email || "").trim());

@@ -12,6 +12,7 @@ const cart = require('./cart')
 const checkout = require('./checkout')
 const admin = require('./admin')
 const video = require('./video')
+const settings = require('./settings')
 
 
 
@@ -29,5 +30,6 @@ router.use("/cart", cart)
 router.use("/checkout", checkout)
 router.use("/admin", admin)
 router.use("/video", video)
+router.use("/settings", settings)
 
 module.exports = router;

@@ -1,107 +1,86 @@
+const fs = require("fs");
+const slugify = require("slugify");
+const categoreModel = require("../models/categore.model");
+const subcategorieModel = require("../models/subcategorie.model");
+const cloudinary = require("../utils/cloudinary");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-const categoreModel = require("../models/categore.model");
-const path = require("path");
-const fs = require("fs");
-const slugify = require('slugify');
-const cloudinary = require("../utils/cloudinary");
+const messages = require("../utils/messages");
 
+/** Category slug that stays unique when two categories share a name. */
+const buildSlug = async (name, ignoreId) => {
+  const base = slugify(name, { replacement: "-", lower: true, trim: true }) || "category";
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
+    const clash = await categoreModel.findOne({ slug: candidate }).select("_id");
+    if (!clash || String(clash._id) === String(ignoreId)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+};
 
-exports.productsController = asyncHandler(async (req, res, next) => {
-    let { name, discount, subcategories } = req.body;
+exports.productsController = asyncHandler(async (req, res) => {
+  const name = String(req.body.name || "").trim();
+  if (!name) return apiResponse(res, 400, messages.titleRequired);
+  if (!req.file) return apiResponse(res, 400, messages.categoryImageRequired);
 
-    
-    if (!req.file) return apiResponse(res, 400, "category image is required");
-    let { filename } = req.file;
+  const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "nh-shop/categories" });
+  fs.unlink(req.file.path, () => {});
 
-    console.log(req.body);
-    const uploadResult = await cloudinary.uploader
-        .upload(
-            req.file.path
-        )
-        .catch((error) => {
-            console.log(error);
-        });
+  const category = await categoreModel.create({
+    name,
+    discount: Math.max(Number(req.body.discount) || 0, 0),
+    image: uploadResult.secure_url || uploadResult.url,
+    uploadResultId: uploadResult.public_id,
+    slug: await buildSlug(name),
+  });
 
-    let imagepath = path.join(__dirname, "../uploads")
-    fs.unlink(`${imagepath}/${filename}`, async (err) => {
-        if (err) {
-            apiResponse(res, 500, err.message);
-        }
-    })
-
-
-    let slug = slugify(name, {
-        replacement: '-',
-        remove: undefined,
-        lower: true,
-        trim: true
-    })
-
-
-    let categoreys = new categoreModel({
-        name, discount, subcategories, image: uploadResult.url, slug, uploadResultId: uploadResult.public_id
-
-    })
-
-    await categoreys.save();
-    console.log(categoreys);
-    apiResponse(res, 200, "Product created successfully", categoreys);
+  apiResponse(res, 201, messages.categoryCreated, category);
 });
 
-exports.updateCategoryController = asyncHandler(async (req, res, next) => {
-    let { id } = req.params;
-    let { name, discount } = req.body;
-    let filename = req.file?.filename;
-    if (req.file) {
-        let categoryImage = await categoreModel.findOne({ _id: id })
-        if (!categoryImage) return apiResponse(res, 404, "category not found");
-        let filepath = categoryImage.image.split("/")
-        let imagepath = filepath[filepath.length - 1]
+exports.updateCategoryController = asyncHandler(async (req, res) => {
+  const category = await categoreModel.findById(req.params.id);
+  if (!category) return apiResponse(res, 404, messages.categoryNotFound);
 
-        let oldpath = path.join(__dirname, "../uploads")
-        fs.unlink(`${oldpath}/${imagepath}`, () => {})
-        categoryImage.name = name;
-        categoryImage.discount = discount;
-        categoryImage.slug = slugify(name, { replacement: "-", lower: true, trim: true });
-        categoryImage.image = `${process.env.SERVER_URL}/${filename}`;
-        await categoryImage.save();
-        apiResponse(res, 200, "category updated", categoryImage)
+  if (req.body.name !== undefined && String(req.body.name).trim()) {
+    category.name = String(req.body.name).trim();
+    category.slug = await buildSlug(category.name, category._id);
+  }
+  if (req.body.discount !== undefined) category.discount = Math.max(Number(req.body.discount) || 0, 0);
 
+  if (req.file) {
+    // Swap the Cloudinary asset rather than pointing at a local upload path.
+    if (category.uploadResultId) await cloudinary.uploader.destroy(category.uploadResultId).catch(() => {});
+    const uploadResult = await cloudinary.uploader.upload(req.file.path, { folder: "nh-shop/categories" });
+    fs.unlink(req.file.path, () => {});
+    category.image = uploadResult.secure_url || uploadResult.url;
+    category.uploadResultId = uploadResult.public_id;
+  }
 
-    } else {
-        let update = await categoreModel.findOneAndUpdate({ _id: id }, { name, discount, slug: slugify(name, { replacement: "-", lower: true, trim: true }) }, { new: true })
-        apiResponse(res, 200, "category updated", update)
-    }
-
+  await category.save();
+  apiResponse(res, 200, messages.categoryUpdated, category);
 });
 
-exports.deleteCategoryController = asyncHandler(async (req, res, next) => {
-    let { id } = req.params;
-    let categoryDelete = await categoreModel.findOneAndDelete({ _id: id })
-    if (!categoryDelete) return apiResponse(res, 404, "category not found");
-    if (categoryDelete.uploadResultId) await cloudinary.uploader.destroy(categoryDelete.uploadResultId)
+exports.deleteCategoryController = asyncHandler(async (req, res) => {
+  const category = await categoreModel.findByIdAndDelete(req.params.id);
+  if (!category) return apiResponse(res, 404, messages.categoryNotFound);
 
-    apiResponse(res, 200, "category deleted successfully");
+  if (category.uploadResultId) await cloudinary.uploader.destroy(category.uploadResultId).catch(() => {});
+  await subcategorieModel.deleteMany({ category: category._id });
 
-});
-exports.allCategoryController = asyncHandler(async (req, res, next) => {
-    let categories = await categoreModel.find({}).populate({ path: "subcategories", select: "_id name" }).select("_id name image slug discount subcategories");
-    apiResponse(res, 200, "All categories fetched successfully", categories);
-
+  apiResponse(res, 200, messages.categoryDeleted);
 });
 
-exports.singleCategoryController = asyncHandler(async (req, res, next) => {
-    let { slug } = req.params;
-    let categorySingle = await categoreModel.findOne({ slug });
+exports.allCategoryController = asyncHandler(async (req, res) => {
+  const categories = await categoreModel
+    .find({})
+    .sort({ name: 1 })
+    .populate({ path: "subcategories", select: "_id name" })
+    .select("_id name image slug discount subcategories");
+  apiResponse(res, 200, messages.categoriesFetched, categories);
+});
 
-    if (categorySingle) {
-        apiResponse(res, 200, "Slug categories fetched successfully", categorySingle);
-
-    } else {
-        apiResponse(res, 404, "Slug categories fetched not found");
-
-    }
-
-
-})
+exports.singleCategoryController = asyncHandler(async (req, res) => {
+  const category = await categoreModel.findOne({ slug: req.params.slug }).populate({ path: "subcategories", select: "_id name" });
+  if (!category) return apiResponse(res, 404, messages.categoryNotFound);
+  apiResponse(res, 200, messages.categoriesFetched, category);
+});
