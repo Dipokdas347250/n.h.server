@@ -21,7 +21,7 @@ const cartSchema = new mongoose.Schema(
         
         totalprice:{
             type: Number,
-            require:[true , "totalprice is require"]
+            required:[true , "totalprice is required"]
         }
   
    

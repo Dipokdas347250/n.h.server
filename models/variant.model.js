@@ -14,12 +14,12 @@ const variantSchema = new mongoose.Schema(
    sku:{
     type: String,
     trim: true,
-    require: [ true, "sku is required"]
+    required: [ true, "sku is required"]
    },
    product:{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Product",
-    require: [ true, "product is required"]
+    required: [ true, "product is required"]
    }
 
 

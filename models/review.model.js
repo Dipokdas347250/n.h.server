@@ -5,7 +5,7 @@ const reviewSchema = new mongoose.Schema(
     user:{
         type: mongoose.Types.ObjectId,
         ref: 'User',
-         require: [true,"user is required"],
+         required: [true,"user is required"],
     } ,
     comment:{
          type:String,
@@ -14,7 +14,9 @@ const reviewSchema = new mongoose.Schema(
     },
     rating:{
          type:Number,
-         require: [true,"rating is required"],
+         required: [true,"rating is required"],
+         min: 1,
+         max: 5,
 
     },
     image:{
@@ -23,6 +25,11 @@ const reviewSchema = new mongoose.Schema(
     product:{
         type:mongoose.Types.ObjectId,
         ref: "Product"
+    },
+    // True when the reviewer has a delivered order containing this product.
+    verifiedPurchase:{
+        type:Boolean,
+        default:false,
     }
    
 

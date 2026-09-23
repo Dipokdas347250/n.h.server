@@ -2,56 +2,49 @@ const categoreModel = require("../models/categore.model");
 const subcategorieModel = require("../models/subcategorie.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
-// const slugify = require('slugify')
+const messages = require("../utils/messages");
 
+exports.addSubcategory = asyncHandler(async (req, res) => {
+  const name = String(req.body.name || "").trim();
+  const { category } = req.body || {};
+  if (!name) return apiResponse(res, 400, messages.titleRequired);
+  if (!(await categoreModel.exists({ _id: category }))) return apiResponse(res, 400, messages.categoryRequired);
 
-exports.addSubcategory= asyncHandler(async (req, res, next) => {
-    let { name , category} = req.body;
-    //  let slug = slugify(name, {
-    //   replacement: '-',  
-    //   remove: undefined, 
-    //   lower: true,            
-    //   trim: true         
-    // })
-    let subcategory = new subcategorieModel({
-        name, category
-    });
-    await subcategory.save();
+  const subcategory = await subcategorieModel.create({ name, category });
+  await categoreModel.findByIdAndUpdate(category, { $addToSet: { subcategories: subcategory._id } });
 
-   await categoreModel.findOneAndUpdate({_id:category},{$push:{subcategories:subcategory._id}}, {new:true});
-
-    
-
-
-
-    apiResponse(res, 200, "Subcategory created successfully", subcategory);
-
-});
-exports.updateSubcategory= asyncHandler(async (req,res,next)=>{
-    let {id}= req.params;
-    let {name, category}= req.body;
-    if(category){
-    let subcatecory = await subcategorieModel.findOneAndUpdate({_id:id},{name,category},{new:true});
-    await categoreModel.findOneAndUpdate({_id:category},{$push:{subcategory:id}},{new:true})
-
-    apiResponse(res, 200 , "subcategory createde",subcatecory)
-    }else{
-       let subcatecory = await subcategorieModel.findOneAndUpdate({_id:id},{name},{new:true});
-         apiResponse(res, 200 , "subcategory createde success",subcatecory)
-
-    }
-
+  apiResponse(res, 201, messages.subcategoryCreated, subcategory);
 });
 
-exports.deleteSubcategory= asyncHandler(async(req,res,next)=>{
-    let {id} = req.params;
-    await subcategorieModel.findByIdAndDelete({_id: id})
-    await categoreModel.findOneAndUpdate({subcategories:id},{$pull:{subcategories:id}})
-    apiResponse(res , 200 , "subcategory deleteed")
+exports.updateSubcategory = asyncHandler(async (req, res) => {
+  const subcategory = await subcategorieModel.findById(req.params.id);
+  if (!subcategory) return apiResponse(res, 404, messages.subcategoryNotFound);
+
+  const { name, category } = req.body || {};
+  if (name !== undefined && String(name).trim()) subcategory.name = String(name).trim();
+
+  if (category && String(category) !== String(subcategory.category)) {
+    if (!(await categoreModel.exists({ _id: category }))) return apiResponse(res, 400, messages.categoryRequired);
+    // Move it: detach from the old parent before attaching to the new one.
+    await categoreModel.findByIdAndUpdate(subcategory.category, { $pull: { subcategories: subcategory._id } });
+    await categoreModel.findByIdAndUpdate(category, { $addToSet: { subcategories: subcategory._id } });
+    subcategory.category = category;
+  }
+
+  await subcategory.save();
+  apiResponse(res, 200, messages.subcategoryUpdated, subcategory);
 });
 
-exports.allSubcategory= asyncHandler(async(req,res,next)=>{
-    let subcatecory = await subcategorieModel.find({})
-    apiResponse(res, 200, "all subcategory fatch successfull", subcatecory)
+exports.deleteSubcategory = asyncHandler(async (req, res) => {
+  const subcategory = await subcategorieModel.findByIdAndDelete(req.params.id);
+  if (!subcategory) return apiResponse(res, 404, messages.subcategoryNotFound);
 
-})
+  await categoreModel.findByIdAndUpdate(subcategory.category, { $pull: { subcategories: subcategory._id } });
+  apiResponse(res, 200, messages.subcategoryDeleted);
+});
+
+exports.allSubcategory = asyncHandler(async (req, res) => {
+  const query = req.query.category ? { category: req.query.category } : {};
+  const subcategories = await subcategorieModel.find(query).populate("category", "name slug");
+  apiResponse(res, 200, messages.subcategoriesFetched, subcategories);
+});

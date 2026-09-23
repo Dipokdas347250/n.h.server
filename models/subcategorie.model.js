@@ -13,7 +13,7 @@ const subcategorySchema = new mongoose.Schema({
     // },
     category: {
         type: mongoose.Types.ObjectId,
-        ref: 'Category',
+        ref: 'categoryModle',
     }
 }, {
     timestamps: true,
