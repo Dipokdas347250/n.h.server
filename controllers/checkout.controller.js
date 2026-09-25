@@ -54,6 +54,7 @@ const buildCustomer = (body, user) => {
     address: value(shipping.address, body.address, user?.Adderss),
     city: value(shipping.city, body.city),
     district: value(shipping.district, body.district),
+    division: value(shipping.division, body.division),
     postcode: value(shipping.postcode, body.postcode),
     note: value(shipping.note, body.note),
   };

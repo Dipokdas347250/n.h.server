@@ -14,6 +14,7 @@ const customerSchema = new Schema(
     address: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     district: { type: String, required: true, trim: true },
+    division: { type: String, trim: true, default: "" },
     postcode: { type: String, trim: true, default: "" },
     note: { type: String, trim: true, default: "" },
   },
