@@ -24,6 +24,15 @@ const settingSchema = new mongoose.Schema(
     deliveryZones: { type: [deliveryZoneSchema], default: undefined },
     freeDeliveryThreshold: { type: Number, default: 0, min: 0 },
     codMaxAmount: { type: Number, default: 20000, min: 0 },
+    // Meta (Facebook) Pixel id for the storefront; blank switches tracking off.
+    metaPixelId: { type: String, trim: true, default: "" },
+    // Steadfast Courier. The keys are write-only from the dashboard's point of
+    // view: the API never sends them back (see `adminSettingsView`).
+    steadfast: {
+      apiKey: { type: String, trim: true, default: "" },
+      secretKey: { type: String, trim: true, default: "" },
+      autoSend: { type: Boolean, default: false },
+    },
     fraud: {
       enabled: { type: Boolean, default: true },
       blockScore: { type: Number, default: 70 },

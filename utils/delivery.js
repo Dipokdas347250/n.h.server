@@ -29,6 +29,7 @@ const publicDeliveryConfig = (settings) => ({
   currency: settings?.currency || "BDT",
   freeDeliveryThreshold: Number(settings?.freeDeliveryThreshold || 0),
   codMaxAmount: Number(settings?.codMaxAmount || 0),
+  metaPixelId: settings?.metaPixelId || "",
   deliveryZones: (settings?.deliveryZones?.length ? settings.deliveryZones : Setting.DEFAULT_ZONES).map((zone) => ({
     key: zone.key,
     label: zone.label,

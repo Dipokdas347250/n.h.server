@@ -85,6 +85,18 @@ const orderSchema = new Schema(
     verifiedBy: { type: mongoose.Types.ObjectId, ref: "User", default: null },
     verifiedAt: { type: Date, default: null },
 
+    // Courier booking. Empty until the order is sent to Steadfast.
+    courier: {
+      provider: { type: String, default: "" },
+      consignmentId: { type: String, default: "" },
+      trackingCode: { type: String, default: "" },
+      status: { type: String, default: "" },
+      sentAt: { type: Date, default: null },
+      sentBy: { type: mongoose.Types.ObjectId, ref: "User", default: null },
+      checkedAt: { type: Date, default: null },
+      error: { type: String, default: "" },
+    },
+
     ipAddress: { type: String, default: "" },
     userAgent: { type: String, default: "" },
   },

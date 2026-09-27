@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema({
     photo:{
         type: String,
     },
+    // Cloudinary id of `photo`, so replacing the picture deletes the old one.
+    photoId:{
+        type: String,
+    },
     otp:{
         type:String,
         
