@@ -15,6 +15,19 @@ const videoSchema = new mongoose.Schema(
     // Optional Bangla copy; the storefront falls back to the English text.
     titleBn: { type: String, trim: true, default: "" },
     descriptionBn: { type: String, trim: true, default: "" },
+    // `youtube` videos are embedded from YouTube; `upload` ones are files kept
+    // on Cloudinary (the older way, still played back for existing entries).
+    source: {
+      type: String,
+      enum: ["upload", "youtube"],
+      default: "upload",
+    },
+    youtubeId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    // Playable URL: the Cloudinary file, or the YouTube watch link.
     video: {
       type: String,
       required: [true, "video is required"],

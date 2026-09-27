@@ -1,3 +1,4 @@
+const fs = require("fs");
 const bcrypt = require("bcrypt");
 const userModel = require("../models/user.model");
 const { apiResponse } = require("../utils/apiResponse");
@@ -6,6 +7,7 @@ const sendEmail = require("../helpers/sendEmail");
 const otpNumber = require("../helpers/otp");
 const { vaildEmail } = require("../helpers/vaildEmail");
 const messages = require("../utils/messages");
+const cloudinary = require("../utils/cloudinary");
 // Shared with the email template so the quoted expiry always matches the real one.
 const { OTP_EXPIRY_MS } = require("../config/mail.config");
 
@@ -18,6 +20,7 @@ const publicUser = (user) => ({
   email: user.email,
   phone: user.phone || "",
   address: user.Adderss || "",
+  photo: user.photo || "",
   role: user.role,
 });
 
@@ -144,7 +147,7 @@ exports.alluserController = asyncHandler(async (req, res) => {
 });
 
 exports.getMeController = asyncHandler(async (req, res) => {
-  const user = await userModel.findById(req.session?.user?._id).select("_id fullname email phone Adderss role");
+  const user = await userModel.findById(req.session?.user?._id).select("_id fullname email phone Adderss photo role");
   if (!user) return apiResponse(res, 404, messages.userNotFound);
   apiResponse(res, 200, messages.profileFetched, publicUser(user));
 });
@@ -165,6 +168,33 @@ exports.updateProfileController = asyncHandler(async (req, res) => {
 
   req.session.user = { ...req.session.user, ...publicUser(user) };
   apiResponse(res, 200, messages.profileUpdated, publicUser(user));
+});
+
+/** Replaces the signed-in account's profile picture. */
+exports.updatePhotoController = asyncHandler(async (req, res) => {
+  if (!req.file) return apiResponse(res, 400, messages.photoRequired);
+
+  const user = await userModel.findById(req.session.user._id);
+  if (!user) {
+    fs.unlink(req.file.path, () => {});
+    return apiResponse(res, 404, messages.userNotFound);
+  }
+
+  const uploadResult = await cloudinary.uploader
+    .upload(req.file.path, {
+      folder: "nh-shop/profiles",
+      transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }],
+    })
+    .finally(() => fs.unlink(req.file.path, () => {}));
+
+  const previousId = user.photoId;
+  user.photo = uploadResult.secure_url || uploadResult.url;
+  user.photoId = uploadResult.public_id;
+  await user.save();
+  if (previousId) await cloudinary.uploader.destroy(previousId).catch(() => {});
+
+  req.session.user = { ...req.session.user, ...publicUser(user) };
+  apiResponse(res, 200, messages.photoUpdated, publicUser(user));
 });
 
 exports.logoutController = asyncHandler(async (req, res) => {

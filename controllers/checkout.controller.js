@@ -8,6 +8,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const messages = require("../utils/messages");
 const { resolveDelivery } = require("../utils/delivery");
 const { evaluateOrder, normalizePhone, isValidBdPhone } = require("../utils/fraudCheck");
+const { parseDateRange } = require("../utils/dateRange");
 const { v4: uuidv4 } = require("uuid");
 
 const SSLCommerzPayment = require("sslcommerz-lts");
@@ -299,12 +300,18 @@ exports.paymentIpnController = asyncHandler(async (req, res) => {
   apiResponse(res, 200, messages.paymentSuccess);
 });
 
-/** Every order, for the dashboard. Supports filtering by fraud status. */
+/**
+ * Every order, for the dashboard. Filters by fraud status, delivery status,
+ * risk level and by Dhaka calendar date (`from`/`to` as `YYYY-MM-DD`).
+ */
 exports.getallordersController = asyncHandler(async (req, res) => {
   const query = {};
-  if (req.query.fraudStatus) query.fraudStatus = req.query.fraudStatus;
-  if (req.query.deliveryStatus) query.deliveryStatus = req.query.deliveryStatus;
-  if (req.query.riskLevel) query.riskLevel = req.query.riskLevel;
+  if (req.query.fraudStatus) query.fraudStatus = String(req.query.fraudStatus);
+  if (req.query.deliveryStatus) query.deliveryStatus = String(req.query.deliveryStatus);
+  if (req.query.riskLevel) query.riskLevel = String(req.query.riskLevel);
+
+  const range = parseDateRange(req.query);
+  if (range) query.createdAt = { $gte: range.start, $lt: range.end };
 
   const orders = await checkoutModel
     .find(query)

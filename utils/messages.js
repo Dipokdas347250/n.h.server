@@ -36,6 +36,8 @@ const messages = {
   userNotFound: { en: "User not found", bn: "ব্যবহারকারী পাওয়া যায়নি" },
   profileFetched: { en: "Profile fetched successfully", bn: "প্রোফাইল সফলভাবে আনা হয়েছে" },
   profileUpdated: { en: "Profile updated successfully", bn: "প্রোফাইল সফলভাবে হালনাগাদ হয়েছে" },
+  photoRequired: { en: "Please choose a picture to upload", bn: "আপলোড করার জন্য একটি ছবি নির্বাচন করুন" },
+  photoUpdated: { en: "Profile picture updated", bn: "প্রোফাইল ছবি হালনাগাদ হয়েছে" },
   usersFetched: { en: "Users fetched successfully", bn: "ব্যবহারকারীদের তালিকা আনা হয়েছে" },
 
   // ---- catalogue ----
@@ -85,6 +87,10 @@ const messages = {
   videoDeleted: { en: "Video deleted successfully", bn: "ভিডিও সফলভাবে মুছে ফেলা হয়েছে" },
   videoNotFound: { en: "Video not found", bn: "ভিডিও পাওয়া যায়নি" },
   videosFetched: { en: "Videos fetched successfully", bn: "ভিডিওর তালিকা আনা হয়েছে" },
+  youtubeUrlInvalid: {
+    en: "That does not look like a YouTube video link",
+    bn: "এটি সঠিক ইউটিউব ভিডিও লিংক নয়",
+  },
   videoRequired: { en: "A video file is required", bn: "ভিডিও ফাইল দেওয়া আবশ্যক" },
   titleRequired: { en: "A title is required", bn: "শিরোনাম দেওয়া আবশ্যক" },
 
@@ -146,11 +152,39 @@ const messages = {
   settingsUpdated: { en: "Store settings updated successfully", bn: "স্টোর সেটিংস সফলভাবে হালনাগাদ হয়েছে" },
   deliveryZoneInvalid: { en: "Please choose a valid delivery area", bn: "সঠিক ডেলিভারি এলাকা নির্বাচন করুন" },
 
+  // ---- Meta Pixel / Steadfast courier ----
+  pixelIdInvalid: {
+    en: "The Meta Pixel ID should be the number from Events Manager (digits only)",
+    bn: "মেটা পিক্সেল আইডি হবে ইভেন্টস ম্যানেজারের নম্বরটি (শুধু সংখ্যা)",
+  },
+  steadfastNotConfigured: {
+    en: "Add your Steadfast API key and secret key in Store settings first",
+    bn: "আগে স্টোর সেটিংসে স্টেডফাস্টের API কী ও সিক্রেট কী দিন",
+  },
+  steadfastSent: { en: "Order sent to Steadfast", bn: "অর্ডার স্টেডফাস্টে পাঠানো হয়েছে" },
+  steadfastAlreadySent: { en: "This order is already booked with Steadfast", bn: "এই অর্ডারটি ইতিমধ্যে স্টেডফাস্টে বুক করা হয়েছে" },
+  steadfastNotSent: { en: "This order has not been sent to Steadfast yet", bn: "এই অর্ডারটি এখনও স্টেডফাস্টে পাঠানো হয়নি" },
+  steadfastNotReady: {
+    en: "Cancelled or delivered orders cannot be sent to the courier",
+    bn: "বাতিল বা ডেলিভারি হওয়া অর্ডার কুরিয়ারে পাঠানো যায় না",
+  },
+  steadfastNeedsReview: {
+    en: "Confirm this order in Fake order review before sending it",
+    bn: "পাঠানোর আগে ভুয়া অর্ডার যাচাই পাতায় অর্ডারটি নিশ্চিত করুন",
+  },
+  steadfastStatusFetched: { en: "Courier status updated", bn: "কুরিয়ারের অবস্থা হালনাগাদ হয়েছে" },
+  steadfastConnected: { en: "Connected to Steadfast", bn: "স্টেডফাস্টের সাথে সংযোগ হয়েছে" },
+  steadfastBulkDone: (sent, failed) => ({
+    en: `${sent} sent to Steadfast${failed ? `, ${failed} not sent` : ""}`,
+    bn: `${sent} টি স্টেডফাস্টে পাঠানো হয়েছে${failed ? `, ${failed} টি পাঠানো যায়নি` : ""}`,
+  }),
+
   // ---- misc ----
   visitRecorded: { en: "Visit recorded", bn: "ভিজিট রেকর্ড করা হয়েছে" },
   visitorKeyRequired: { en: "A visitor key is required", bn: "ভিজিটর কী প্রয়োজন" },
   dashboardFetched: { en: "Dashboard data fetched successfully", bn: "ড্যাশবোর্ডের তথ্য সফলভাবে আনা হয়েছে" },
   analyticsFetched: { en: "Analytics fetched successfully", bn: "অ্যানালিটিক্স সফলভাবে আনা হয়েছে" },
+  reportFetched: { en: "Report fetched successfully", bn: "হিসাব সফলভাবে আনা হয়েছে" },
   transactionsFetched: { en: "Transactions fetched successfully", bn: "লেনদেনের তালিকা আনা হয়েছে" },
   subadminApplied: { en: "Your request has been submitted", bn: "আপনার আবেদন জমা হয়েছে" },
   subadminExists: { en: "A sub-admin request already exists", bn: "সাব-অ্যাডমিনের আবেদন ইতিমধ্যে আছে" },
