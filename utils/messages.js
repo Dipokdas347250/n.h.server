@@ -12,8 +12,13 @@ const messages = {
   invalidEmail: { en: "Invalid email address", bn: "ইমেইল ঠিকানাটি সঠিক নয়" },
   emailNotFound: { en: "No account found with this email", bn: "এই ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি" },
   invalidPassword: { en: "Incorrect password", bn: "পাসওয়ার্ড সঠিক নয়" },
+  currentPasswordRequired: {
+    en: "Enter your current password to change the email",
+    bn: "ইমেইল পরিবর্তন করতে বর্তমান পাসওয়ার্ড দিন",
+  },
   notVerified: { en: "Please verify your email before logging in", bn: "লগইন করার আগে আপনার ইমেইল যাচাই করুন" },
-  noDashboardAccess: { en: "This account does not have dashboard access", bn: "এই অ্যাকাউন্টের ড্যাশবোর্ড ব্যবহারের অনুমতি নেই" },
+  noDashboardAccess: { en: "Only administrators can sign in to the dashboard", bn: "শুধুমাত্র অ্যাডমিন ড্যাশবোর্ডে সাইন ইন করতে পারেন" },
+  dashboardStatusFetched: { en: "Dashboard status fetched", bn: "ড্যাশবোর্ডের অবস্থা আনা হয়েছে" },
   adminExists: {
     en: "An administrator already exists. Ask an administrator to create your account.",
     bn: "একজন অ্যাডমিন ইতিমধ্যে আছেন। নতুন অ্যাকাউন্টের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।",
@@ -32,7 +37,7 @@ const messages = {
     bn: "যাচাইকরণ ইমেইল পাঠানো যায়নি। মেইল সার্ভারের সেটিংস দেখে আবার চেষ্টা করুন।",
   },
   loginRequired: { en: "Access denied. Please login first.", bn: "প্রবেশাধিকার নেই। আগে লগইন করুন।" },
-  adminRequired: { en: "Access denied. Admin or sub-admin access required.", bn: "প্রবেশাধিকার নেই। অ্যাডমিন বা সাব-অ্যাডমিন অনুমতি প্রয়োজন।" },
+  adminRequired: { en: "Access denied. Admin access required.", bn: "প্রবেশাধিকার নেই। অ্যাডমিন অনুমতি প্রয়োজন।" },
   userNotFound: { en: "User not found", bn: "ব্যবহারকারী পাওয়া যায়নি" },
   profileFetched: { en: "Profile fetched successfully", bn: "প্রোফাইল সফলভাবে আনা হয়েছে" },
   profileUpdated: { en: "Profile updated successfully", bn: "প্রোফাইল সফলভাবে হালনাগাদ হয়েছে" },

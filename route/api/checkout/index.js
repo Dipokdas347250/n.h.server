@@ -28,6 +28,6 @@ router.route("/payment_cancel/:id").get(paymentCancelController).post(paymentCan
 router.post("/payment_ipn", paymentIpnController);
 
 router.get("/my-orders", validAuthorize, myOrdersController);
-router.get("/all-orders", validAuthorize, isAuthorizeRole("admin", "subadmin"), getallordersController);
+router.get("/all-orders", validAuthorize, isAuthorizeRole("admin"), getallordersController);
 
 module.exports = router;

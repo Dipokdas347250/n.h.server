@@ -10,7 +10,7 @@ const { validAuthorize } = require('../../../middleware/validAuthorize');
 const { isAuthorizeRole } = require('../../../middleware/isAuthorizeRole');
 
 const router = express.Router();
-const staffOnly = [validAuthorize, isAuthorizeRole("admin", "subadmin")];
+const staffOnly = [validAuthorize, isAuthorizeRole("admin")];
 
 router.get("/all-banner", allBannerController);
 router.post("/add-banner", ...staffOnly, upload.single("image"), addBannerController);
