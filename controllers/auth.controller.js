@@ -33,17 +33,21 @@ const registerUser = async (req, res, { role }) => {
   if (!vaildEmail(email)) return apiResponse(res, 400, messages.invalidEmail);
 
   const normalizedEmail = email.trim().toLowerCase();
-  if (await userModel.exists({ email: normalizedEmail })) {
-    return apiResponse(res, 400, messages.emailInUse);
-  }
-  if (role === "admin" && (await userModel.exists({ role: "admin" }))) {
+  // Only one administrator can register here; the one who started but did not
+  // finish verifying may register again with the same email.
+  if (role === "admin" && (await userModel.exists({ role: "admin", email: { $ne: normalizedEmail } }))) {
     return apiResponse(res, 403, messages.adminExists);
   }
 
+  // An account that never verified its email was not proven to belong to
+  // anyone, so registering again with that address replaces it.
+  const existing = await userModel.findOne({ email: normalizedEmail });
+  if (existing?.verified) return apiResponse(res, 400, messages.emailInUse);
+
   const otp = otpNumber();
-  const user = new userModel({
+  const user = existing || new userModel({ email: normalizedEmail });
+  user.set({
     fullname: fullname.trim(),
-    email: normalizedEmail,
     password: await bcrypt.hash(password, 12),
     phone,
     Adderss: address,
@@ -75,10 +79,16 @@ exports.signupController = asyncHandler((req, res) => registerUser(req, res, { r
 /** Creates the very first dashboard administrator. */
 exports.dashboardSignupController = asyncHandler((req, res) => registerUser(req, res, { role: "admin" }));
 
+/** Tells the dashboard's sign-in page whether the first administrator still has to be created. */
+exports.dashboardStatusController = asyncHandler(async (req, res) => {
+  const adminExists = Boolean(await userModel.exists({ role: "admin", verified: true }));
+  apiResponse(res, 200, messages.dashboardStatusFetched, { adminExists });
+});
+
 /**
  * Signs a customer in. The same endpoint serves the storefront and the
- * dashboard; passing `scope: "dashboard"` additionally requires staff access so
- * a normal shopper cannot land inside the admin panel.
+ * dashboard; passing `scope: "dashboard"` additionally requires the admin role
+ * so a normal shopper cannot land inside the admin panel.
  */
 exports.loginController = asyncHandler(async (req, res) => {
   const { email, password, scope } = req.body || {};
@@ -88,11 +98,11 @@ exports.loginController = asyncHandler(async (req, res) => {
   if (!loginUser) return apiResponse(res, 404, messages.emailNotFound);
   if (!loginUser.verified) return apiResponse(res, 403, messages.notVerified);
 
-  const isStaff = ["admin", "subadmin"].includes(loginUser.role);
-  if (scope === "dashboard" && !isStaff) return apiResponse(res, 403, messages.noDashboardAccess);
-
   const matches = await bcrypt.compare(String(password || ""), loginUser.password);
   if (!matches) return apiResponse(res, 401, messages.invalidPassword);
+
+  // Checked after the password so the dashboard does not reveal which emails belong to shoppers.
+  if (scope === "dashboard" && loginUser.role !== "admin") return apiResponse(res, 403, messages.noDashboardAccess);
 
   req.session.cookie.maxAge = SESSION_TTL_MS;
   req.session.user = { ...publicUser(loginUser), login: true };
@@ -156,7 +166,24 @@ exports.updateProfileController = asyncHandler(async (req, res) => {
   const user = await userModel.findById(req.session.user._id);
   if (!user) return apiResponse(res, 404, messages.userNotFound);
 
-  const { fullname, phone, address, password } = req.body || {};
+  const { fullname, email, phone, address, password, currentPassword } = req.body || {};
+
+  // The email is the sign-in name, so changing it needs the current password.
+  if (email !== undefined) {
+    const nextEmail = String(email).trim().toLowerCase();
+    if (nextEmail !== user.email) {
+      if (!vaildEmail(nextEmail)) return apiResponse(res, 400, messages.invalidEmail);
+      if (!currentPassword) return apiResponse(res, 400, messages.currentPasswordRequired);
+      if (!(await bcrypt.compare(String(currentPassword), user.password))) {
+        return apiResponse(res, 401, messages.invalidPassword);
+      }
+      if (await userModel.exists({ email: nextEmail, _id: { $ne: user._id } })) {
+        return apiResponse(res, 400, messages.emailInUse);
+      }
+      user.email = nextEmail;
+    }
+  }
+
   if (fullname !== undefined && String(fullname).trim()) user.fullname = String(fullname).trim();
   if (phone !== undefined) user.phone = String(phone).trim();
   if (address !== undefined) user.Adderss = String(address).trim();

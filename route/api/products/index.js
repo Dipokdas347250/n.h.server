@@ -11,7 +11,7 @@ const { validAuthorize } = require('../../../middleware/validAuthorize');
 const { isAuthorizeRole } = require('../../../middleware/isAuthorizeRole');
 
 const router = express.Router();
-const staffOnly = [validAuthorize, isAuthorizeRole("admin", "subadmin")];
+const staffOnly = [validAuthorize, isAuthorizeRole("admin")];
 
 router.get("/allCategory", allCategoryController);
 router.get("/allCategory/:slug", singleCategoryController);

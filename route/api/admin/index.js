@@ -23,7 +23,8 @@ const router = express.Router();
 
 router.post("/visits", recordVisitController);
 
-router.use(validAuthorize, isAuthorizeRole("admin", "subadmin"));
+// Everything below is the dashboard, which only administrators may use.
+router.use(validAuthorize, isAuthorizeRole("admin"));
 router.get("/dashboard", dashboardController);
 router.get("/analytics", analyticsController);
 router.get("/transactions", transactionsController);
@@ -36,6 +37,6 @@ router.post("/orders/:id/steadfast", sendToSteadfastController);
 router.post("/orders/:id/steadfast/status", steadfastStatusController);
 router.get("/steadfast/balance", steadfastBalanceController);
 router.get("/settings", adminSettingsController);
-router.patch("/settings", isAuthorizeRole("admin"), updateSettingsController);
+router.patch("/settings", updateSettingsController);
 
 module.exports = router;

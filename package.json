@@ -6,7 +6,8 @@
   "scripts": {
     "start": "nodemon index.js",
     "dev": "nodemon index.js",
-    "mail:test": "node scripts/testMail.js"
+    "mail:test": "node scripts/testMail.js",
+    "admin:create": "node scripts/createAdmin.js"
   },
   "keywords": [],
   "author": "",

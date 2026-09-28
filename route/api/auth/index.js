@@ -2,6 +2,7 @@ const express = require('express');
 const {
   signupController,
   dashboardSignupController,
+  dashboardStatusController,
   loginController,
   alluserController,
   verifyOtpController,
@@ -18,6 +19,7 @@ const upload = require('../../../utils/upload');
 const router = express.Router();
 
 router.post("/signup", signupController);
+router.get("/dashboard-status", dashboardStatusController);
 router.post("/dashboard-signup", dashboardSignupController);
 router.post("/login", loginController);
 router.post("/verifyotp", verifyOtpController);
@@ -29,8 +31,8 @@ router.patch("/profile", validAuthorize, updateProfileController);
 router.patch("/profile/photo", validAuthorize, upload.single("photo"), updatePhotoController);
 router.post("/logout", validAuthorize, logoutController);
 
-// Staff only.
-router.get("/getme", validAuthorize, isAuthorizeRole("admin", "subadmin"), getMeController);
-router.get("/alluser", validAuthorize, isAuthorizeRole("admin", "subadmin"), alluserController);
+// Dashboard (administrators only).
+router.get("/getme", validAuthorize, isAuthorizeRole("admin"), getMeController);
+router.get("/alluser", validAuthorize, isAuthorizeRole("admin"), alluserController);
 
 module.exports = router;
