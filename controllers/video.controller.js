@@ -1,5 +1,6 @@
 const fs = require("fs/promises");
 const path = require("path");
+const mongoose = require("mongoose");
 const videoModel = require("../models/video.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -37,11 +38,33 @@ const parseYoutubeId = (value) => {
   return ID.test(id || "") ? id : "";
 };
 
-const textFields = ({ title, description, titleBn, descriptionBn }) => ({
+// Just what the storefront needs to show a product card under the video.
+const PRODUCT_FIELDS = "title slug image price discountPrice diccountprice";
+
+/**
+ * Product ids from the request: an array, or a JSON/comma-separated string when
+ * sent as form data. Unknown or malformed ids are dropped, duplicates removed.
+ */
+const parseProductIds = (value) => {
+  let list = value;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = list.split(",");
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  const ids = list.map((id) => String(id).trim()).filter((id) => mongoose.isValidObjectId(id));
+  return [...new Set(ids)];
+};
+
+const textFields = ({ title, description, titleBn, descriptionBn, products }) => ({
   title: title.trim(),
   description: description?.trim() || "",
   titleBn: titleBn?.trim() || "",
   descriptionBn: descriptionBn?.trim() || "",
+  products: parseProductIds(products),
 });
 
 exports.addVideoController = asyncHandler(async (req, res) => {
@@ -59,6 +82,7 @@ exports.addVideoController = asyncHandler(async (req, res) => {
       youtubeId,
       video: `https://www.youtube.com/watch?v=${youtubeId}`,
     });
+    await video.populate("products", PRODUCT_FIELDS);
     return apiResponse(res, 201, messages.videoCreated, video);
   }
 
@@ -80,17 +104,18 @@ exports.addVideoController = asyncHandler(async (req, res) => {
     video: uploadResult.secure_url || uploadResult.url,
     uploadResultId: uploadResult.public_id,
   });
+  await video.populate("products", PRODUCT_FIELDS);
 
   return apiResponse(res, 201, messages.videoCreated, video);
 });
 
 exports.allVideoController = asyncHandler(async (req, res) => {
-  const videos = await videoModel.find({ isPublished: true }).sort({ createdAt: -1 });
+  const videos = await videoModel.find({ isPublished: true }).sort({ createdAt: -1 }).populate("products", PRODUCT_FIELDS);
   return apiResponse(res, 200, messages.videosFetched, videos);
 });
 
 exports.allVideoAdminController = asyncHandler(async (req, res) => {
-  const videos = await videoModel.find({}).sort({ createdAt: -1 });
+  const videos = await videoModel.find({}).sort({ createdAt: -1 }).populate("products", PRODUCT_FIELDS);
   return apiResponse(res, 200, messages.videosFetched, videos);
 });
 
@@ -106,6 +131,7 @@ exports.updateVideoController = asyncHandler(async (req, res) => {
     if (!youtubeId) return apiResponse(res, 400, messages.youtubeUrlInvalid);
     Object.assign(updates, { source: "youtube", youtubeId, video: `https://www.youtube.com/watch?v=${youtubeId}` });
   }
+  if (typeof req.body.products !== "undefined") updates.products = parseProductIds(req.body.products);
   if (typeof req.body.isPublished !== "undefined") updates.isPublished = req.body.isPublished === true || req.body.isPublished === "true";
 
   const previous = await videoModel.findById(id);
@@ -117,7 +143,7 @@ exports.updateVideoController = asyncHandler(async (req, res) => {
     updates.uploadResultId = "";
   }
 
-  const video = await videoModel.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+  const video = await videoModel.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).populate("products", PRODUCT_FIELDS);
   return apiResponse(res, 200, messages.videoUpdated, video);
 });
 
