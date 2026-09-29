@@ -37,6 +37,13 @@ const videoSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Products shown in the video, listed under it on the storefront.
+    products: [
+      {
+        type: mongoose.Types.ObjectId,
+        ref: "Product",
+      },
+    ],
     isPublished: {
       type: Boolean,
       default: true,
