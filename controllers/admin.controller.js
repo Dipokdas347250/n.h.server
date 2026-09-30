@@ -7,6 +7,7 @@ const productModel = require("../models/product.model");
 const categoryModel = require("../models/categore.model");
 const visitModel = require("../models/visit.model");
 const { autoSendIfEnabled } = require("./courier.controller");
+const { parseUserAgent } = require("../utils/userAgent");
 const { TIMEZONE, DAY_MS, dhakaDateOf, todayInDhaka, parseDateRange } = require("../utils/dateRange");
 
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -95,24 +96,172 @@ exports.dashboardController = asyncHandler(async (req, res) => {
   });
 });
 
+// Seconds between arriving and the last activity; 0 for pre-session records.
+const DURATION = {
+  $divide: [{ $subtract: [{ $ifNull: ["$lastSeenAt", "$createdAt"] }, "$createdAt"] }, 1000],
+};
+// Pages seen, counting a pre-session record's single page.
+const PAGES = { $ifNull: ["$pages", [{ path: "$path" }]] };
+const SESSIONS_PER_PAGE = 50;
+
+/** Counts per value of one field, most common first. */
+const breakdown = (field, limit = 6) => [
+  { $group: { _id: { $ifNull: [field, "unknown"] }, count: { $sum: 1 } } },
+  { $sort: { count: -1 } },
+  { $limit: limit },
+  { $project: { _id: 0, name: "$_id", count: 1 } },
+];
+
 exports.analyticsController = asyncHandler(async (req, res) => {
-  const [visits, uniqueVisitors, topPaths] = await Promise.all([
-    visitModel.countDocuments(),
-    visitModel.distinct("visitorKey"),
-    visitModel.aggregate([
-      { $group: { _id: "$path", visits: { $sum: 1 }, visitors: { $addToSet: "$visitorKey" } } },
-      { $project: { path: "$_id", visits: 1, visitors: { $size: "$visitors" }, _id: 0 } },
-      { $sort: { visits: -1 } },
-      { $limit: 10 },
-    ]),
+  const range = parseDateRange(req.query);
+  const match = range ? { createdAt: { $gte: range.start, $lt: range.end } } : {};
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+
+  const [facets] = await visitModel.aggregate([
+    { $match: match },
+    {
+      $facet: {
+        summary: [
+          {
+            $group: {
+              _id: null,
+              visits: { $sum: 1 },
+              visitors: { $addToSet: "$visitorKey" },
+              signedIn: { $addToSet: "$user" },
+              pageViews: { $sum: { $size: PAGES } },
+              totalDuration: { $sum: DURATION },
+              // Pre-session records have no timing, so they stay out of the average.
+              timed: { $sum: { $cond: [{ $ifNull: ["$sessionId", false] }, 1, 0] } },
+            },
+          },
+        ],
+        devices: breakdown("$device", 3),
+        browsers: breakdown("$browser"),
+        os: breakdown("$os"),
+        topPaths: [
+          { $project: { visitorKey: 1, pages: PAGES } },
+          { $unwind: "$pages" },
+          { $group: { _id: "$pages.path", visits: { $sum: 1 }, visitors: { $addToSet: "$visitorKey" } } },
+          { $project: { path: "$_id", visits: 1, visitors: { $size: "$visitors" }, _id: 0 } },
+          { $sort: { visits: -1 } },
+          { $limit: 10 },
+        ],
+        sessions: [
+          { $sort: { createdAt: -1 } },
+          { $skip: (page - 1) * SESSIONS_PER_PAGE },
+          { $limit: SESSIONS_PER_PAGE },
+          { $lookup: { from: userModel.collection.name, localField: "user", foreignField: "_id", as: "user" } },
+          { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              visitorKey: 1,
+              path: 1,
+              pages: PAGES,
+              device: { $ifNull: ["$device", "unknown"] },
+              os: 1,
+              browser: 1,
+              referrer: 1,
+              screen: 1,
+              createdAt: 1,
+              lastSeenAt: 1,
+              duration: DURATION,
+              timed: { $cond: [{ $ifNull: ["$sessionId", false] }, true, false] },
+              user: { _id: "$user._id", fullname: "$user.fullname", email: "$user.email", phone: "$user.phone" },
+            },
+          },
+        ],
+      },
+    },
   ]);
-  apiResponse(res, 200, messages.analyticsFetched, { visits, uniqueVisitors: uniqueVisitors.length, topPaths });
+
+  const summary = facets.summary[0];
+  const sessions = facets.sessions;
+
+  // How many times each listed visitor has come, across all time.
+  const keys = [...new Set(sessions.map((session) => session.visitorKey))];
+  const history = await visitModel.aggregate([
+    { $match: { visitorKey: { $in: keys } } },
+    { $group: { _id: "$visitorKey", count: { $sum: 1 } } },
+  ]);
+  const visitsOf = Object.fromEntries(history.map((item) => [item._id, item.count]));
+
+  apiResponse(res, 200, messages.analyticsFetched, {
+    visits: summary?.visits || 0,
+    uniqueVisitors: summary?.visitors.length || 0,
+    signedInVisitors: summary?.signedIn.length || 0,
+    pageViews: summary?.pageViews || 0,
+    averageDuration: summary?.timed ? Math.round(summary.totalDuration / summary.timed) : 0,
+    devices: facets.devices,
+    browsers: facets.browsers,
+    os: facets.os,
+    topPaths: facets.topPaths,
+    sessions: sessions.map((session) => ({
+      ...session,
+      duration: Math.round(session.duration),
+      user: session.user?._id ? session.user : null,
+      totalVisits: visitsOf[session.visitorKey] || 1,
+    })),
+    page,
+    pages: Math.max(1, Math.ceil((summary?.visits || 0) / SESSIONS_PER_PAGE)),
+  });
 });
 
+const SESSION_ID = /^[A-Za-z0-9-]{8,64}$/;
+const clip = (value, length) => String(value || "").slice(0, length);
+
+/**
+ * Called by the storefront on every page it shows (`page`) and every 15
+ * seconds while the visitor is active (`ping`); the gap between the first and
+ * last call is their time on the site.
+ */
 exports.recordVisitController = asyncHandler(async (req, res) => {
-  const visitorKey = req.body?.visitorKey || req.headers["x-visitor-key"];
+  const visitorKey = clip(req.body?.visitorKey || req.headers["x-visitor-key"], 64);
   if (!visitorKey) return apiResponse(res, 400, messages.visitorKeyRequired);
-  await visitModel.create({ visitorKey, path: req.body?.path || "/", user: req.session?.user?._id });
+
+  const userAgent = clip(req.headers["user-agent"], 400);
+  const { isBot, device, os, browser } = parseUserAgent(userAgent, req.body?.touch);
+  if (isBot) return apiResponse(res, 201, messages.visitRecorded);
+
+  const sessionId = String(req.body?.sessionId || "");
+  const path = clip(req.body?.path || "/", 300);
+  const userId = req.session?.user?._id;
+
+  // Older storefront builds send no session id: keep the one-record-per-visit behaviour.
+  if (!SESSION_ID.test(sessionId)) {
+    await visitModel.create({ visitorKey, path, pages: [{ path }], user: userId, device, os, browser, userAgent });
+    return apiResponse(res, 201, messages.visitRecorded);
+  }
+
+  const now = new Date();
+  const found = { sessionId, visitorKey };
+  // Someone who signs in part-way through is credited for the whole session.
+  const seen = { lastSeenAt: now, ...(userId ? { user: userId } : {}) };
+
+  if (req.body?.event === "ping") {
+    await visitModel.updateOne(found, { $set: seen });
+  } else {
+    const update = {
+      $set: seen,
+      $push: { pages: { $each: [{ path, at: now }], $slice: -200 } },
+      $setOnInsert: {
+        path,
+        device,
+        os,
+        browser,
+        userAgent,
+        referrer: clip(req.body?.referrer, 300),
+        screen: clip(req.body?.screen, 20),
+      },
+    };
+    try {
+      await visitModel.updateOne(found, update, { upsert: true });
+    } catch (error) {
+      // Lost a race to open this session; it exists now, so just add the page.
+      if (error.code !== 11000) throw error;
+      await visitModel.updateOne(found, update);
+    }
+  }
+
   apiResponse(res, 201, messages.visitRecorded);
 });
 
