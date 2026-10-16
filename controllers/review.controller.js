@@ -5,6 +5,7 @@ const orderModel = require("../models/checkout.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const messages = require("../utils/messages");
+const { isPublicProduct, publicProductFilter } = require("../utils/merchant");
 
 exports.addreviewContaroller = asyncHandler(async (req, res) => {
   const user = req.session?.user?._id;
@@ -15,7 +16,8 @@ exports.addreviewContaroller = asyncHandler(async (req, res) => {
   if (!product || !comment?.trim() || !Number.isFinite(score) || score < 1 || score > 5) {
     return apiResponse(res, 400, messages.reviewInvalid);
   }
-  if (!(await productModel.exists({ _id: product }))) return apiResponse(res, 404, messages.productNotFound);
+  // Only products customers can see can be reviewed; a hidden one answers like a missing one.
+  if (!(await isPublicProduct(product))) return apiResponse(res, 404, messages.productNotFound);
 
   // A review counts as verified when the customer actually received the product.
   const purchased = await orderModel.exists({
@@ -42,6 +44,7 @@ exports.addreviewContaroller = asyncHandler(async (req, res) => {
 });
 
 exports.productReviewsController = asyncHandler(async (req, res) => {
+  if (!(await isPublicProduct(req.params.productId))) return apiResponse(res, 200, messages.reviewsFetched, []);
   const reviews = await reviewModel
     .find({ product: req.params.productId })
     .sort({ createdAt: -1 })
@@ -53,8 +56,10 @@ exports.allReviewsController = asyncHandler(async (req, res) => {
   const reviews = await reviewModel
     .find({ rating: { $gte: 4 } })
     .sort({ createdAt: -1 })
-    .limit(20)
+    .limit(40)
     .populate("user", "fullname photo")
-    .populate("product", "title");
-  apiResponse(res, 200, messages.reviewsFetched, reviews);
+    .populate({ path: "product", select: "title", match: await publicProductFilter() })
+    .lean();
+  // Reviews of hidden products stay stored but are not shown.
+  apiResponse(res, 200, messages.reviewsFetched, reviews.filter((review) => review.product).slice(0, 20));
 });

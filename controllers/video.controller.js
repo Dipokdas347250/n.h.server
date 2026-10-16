@@ -6,6 +6,7 @@ const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const cloudinary = require("../utils/cloudinary");
 const messages = require("../utils/messages");
+const { publicProductFilter } = require("../utils/merchant");
 
 const removeLocalFile = async (filename) => {
   if (!filename) return;
@@ -110,7 +111,11 @@ exports.addVideoController = asyncHandler(async (req, res) => {
 });
 
 exports.allVideoController = asyncHandler(async (req, res) => {
-  const videos = await videoModel.find({ isPublished: true }).sort({ createdAt: -1 }).populate("products", PRODUCT_FIELDS);
+  // Products a customer may not see right now are left out of each video's list.
+  const videos = await videoModel
+    .find({ isPublished: true })
+    .sort({ createdAt: -1 })
+    .populate({ path: "products", select: PRODUCT_FIELDS, match: await publicProductFilter() });
   return apiResponse(res, 200, messages.videosFetched, videos);
 });
 

@@ -17,7 +17,10 @@ const messages = {
     bn: "ইমেইল পরিবর্তন করতে বর্তমান পাসওয়ার্ড দিন",
   },
   notVerified: { en: "Please verify your email before logging in", bn: "লগইন করার আগে আপনার ইমেইল যাচাই করুন" },
-  noDashboardAccess: { en: "Only administrators can sign in to the dashboard", bn: "শুধুমাত্র অ্যাডমিন ড্যাশবোর্ডে সাইন ইন করতে পারেন" },
+  noDashboardAccess: {
+    en: "Only administrators and approved merchants can sign in to the dashboard",
+    bn: "শুধুমাত্র অ্যাডমিন ও অনুমোদিত মার্চেন্টরা ড্যাশবোর্ডে সাইন ইন করতে পারেন",
+  },
   dashboardStatusFetched: { en: "Dashboard status fetched", bn: "ড্যাশবোর্ডের অবস্থা আনা হয়েছে" },
   adminExists: {
     en: "An administrator already exists. Ask an administrator to create your account.",
@@ -183,6 +186,202 @@ const messages = {
     en: `${sent} sent to Steadfast${failed ? `, ${failed} not sent` : ""}`,
     bn: `${sent} টি স্টেডফাস্টে পাঠানো হয়েছে${failed ? `, ${failed} টি পাঠানো যায়নি` : ""}`,
   }),
+
+  // ---- merchants ----
+  merchantApplied: {
+    en: "Your application has been submitted. We will review it and contact you.",
+    bn: "আপনার আবেদন জমা হয়েছে। আমরা যাচাই করে আপনার সাথে যোগাযোগ করব।",
+  },
+  merchantApplicationInvalid: {
+    en: "Name, mobile number, business name, address, product type, NID number and a password of at least 8 characters are required",
+    bn: "নাম, মোবাইল নম্বর, ব্যবসার নাম, ঠিকানা, পণ্যের ধরন, এনআইডি নম্বর এবং কমপক্ষে ৮ অক্ষরের পাসওয়ার্ড দিতে হবে",
+  },
+  facebookPageInvalid: {
+    en: "Enter your Facebook page link, for example https://facebook.com/yourpage",
+    bn: "আপনার ফেসবুক পেজের লিংক দিন, যেমন https://facebook.com/yourpage",
+  },
+  nidInvalid: {
+    en: "Enter a valid NID number (10, 13 or 17 digits)",
+    bn: "সঠিক এনআইডি নম্বর দিন (১০, ১৩ বা ১৭ সংখ্যা)",
+  },
+  nidPhotoMismatch: {
+    en: "The NID number you typed does not match the number on your NID photo. Check the number, or upload a clearer photo of the front of the card.",
+    bn: "আপনার লেখা এনআইডি নম্বর এনআইডির ছবির নম্বরের সাথে মিলছে না। নম্বরটি আবার দেখুন, অথবা কার্ডের সামনের দিকের আরও পরিষ্কার ছবি দিন।",
+  },
+  nidImagesRequired: {
+    en: "Upload clear photos of the front and back of your NID",
+    bn: "আপনার এনআইডির সামনের ও পেছনের পরিষ্কার ছবি আপলোড করুন",
+  },
+  merchantApplicationPending: {
+    en: "An application with this NID, email or mobile number is already waiting for review",
+    bn: "এই এনআইডি, ইমেইল বা মোবাইল নম্বর দিয়ে একটি আবেদন ইতিমধ্যে যাচাইয়ের অপেক্ষায় আছে",
+  },
+  listingStatusInvalid: { en: "Choose to show or hide the product", bn: "পণ্যটি দেখাতে বা লুকাতে নির্বাচন করুন" },
+  productHidden: { en: "Product hidden from the website", bn: "পণ্যটি ওয়েবসাইট থেকে লুকানো হয়েছে" },
+  productShown: { en: "Product shown on the website again (once approved)", bn: "পণ্যটি আবার ওয়েবসাইটে দেখানো হবে (অনুমোদিত হলে)" },
+  phoneLoginAmbiguous: {
+    en: "More than one merchant account uses this mobile number. Sign in with your email instead.",
+    bn: "এই মোবাইল নম্বর দিয়ে একাধিক মার্চেন্ট অ্যাকাউন্ট আছে। ইমেইল দিয়ে সাইন ইন করুন।",
+  },
+  nidRevealed: { en: "Full NID shown. This was recorded in the audit log.", bn: "পুরো এনআইডি দেখানো হয়েছে। এটি অডিট লগে রেকর্ড করা হয়েছে।" },
+  merchantPhoneInUse: {
+    en: "A merchant account already uses this mobile number. Add an email address to apply for another account.",
+    bn: "এই মোবাইল নম্বর দিয়ে ইতিমধ্যে একটি মার্চেন্ট অ্যাকাউন্ট আছে। আরেকটি অ্যাকাউন্টের জন্য একটি ইমেইল ঠিকানা দিন।",
+  },
+  merchantEmailInUse: {
+    en: "This email already has an account. Apply with a different email.",
+    bn: "এই ইমেইলে ইতিমধ্যে একটি অ্যাকাউন্ট আছে। অন্য ইমেইল দিয়ে আবেদন করুন।",
+  },
+  merchantApplicationsFetched: { en: "Merchant applications fetched", bn: "মার্চেন্ট আবেদনের তালিকা আনা হয়েছে" },
+  merchantApplicationNotFound: { en: "Merchant application not found", bn: "মার্চেন্ট আবেদন পাওয়া যায়নি" },
+  merchantApplicationDecided: {
+    en: "This application has already been decided",
+    bn: "এই আবেদনের সিদ্ধান্ত ইতিমধ্যে নেওয়া হয়েছে",
+  },
+  merchantDuplicateNid: {
+    en: "This NID already belongs to a merchant. Confirm that you want to approve a second account for the same person.",
+    bn: "এই এনআইডি দিয়ে ইতিমধ্যে একটি মার্চেন্ট অ্যাকাউন্ট আছে। একই ব্যক্তির দ্বিতীয় অ্যাকাউন্ট অনুমোদন করতে চাইলে নিশ্চিত করুন।",
+  },
+  merchantApproved: { en: "Merchant approved and account created", bn: "মার্চেন্ট অনুমোদিত হয়েছে এবং অ্যাকাউন্ট তৈরি হয়েছে" },
+  merchantRejected: { en: "Merchant application rejected", bn: "মার্চেন্ট আবেদন বাতিল করা হয়েছে" },
+  merchantsFetched: { en: "Merchants fetched", bn: "মার্চেন্টদের তালিকা আনা হয়েছে" },
+  merchantFetched: { en: "Merchant fetched", bn: "মার্চেন্টের তথ্য আনা হয়েছে" },
+  merchantNotFound: { en: "Merchant not found", bn: "মার্চেন্ট পাওয়া যায়নি" },
+  merchantUpdated: { en: "Merchant updated", bn: "মার্চেন্ট হালনাগাদ হয়েছে" },
+  merchantPaymentRecorded: { en: "Payment recorded", bn: "পেমেন্ট রেকর্ড করা হয়েছে" },
+  merchantPaymentInvalid: {
+    en: "Enter the amount paid and how many months it covers",
+    bn: "পরিশোধিত টাকার পরিমাণ এবং কত মাসের জন্য তা লিখুন",
+  },
+  merchantRequired: { en: "Access denied. Merchant account required.", bn: "প্রবেশাধিকার নেই। মার্চেন্ট অ্যাকাউন্ট প্রয়োজন।" },
+  merchantLocked: {
+    en: "This merchant account is locked. Please contact N H Shop.",
+    bn: "এই মার্চেন্ট অ্যাকাউন্টটি লক করা আছে। অনুগ্রহ করে এন এইচ শপের সাথে যোগাযোগ করুন।",
+  },
+  merchantSuspended: {
+    en: "This merchant account is suspended. Your products and orders are kept safe. Submit your payment proof under Payment & subscription, or contact Help & Support, to reactivate it.",
+    bn: "এই মার্চেন্ট অ্যাকাউন্টটি স্থগিত আছে। আপনার পণ্য ও অর্ডার সংরক্ষিত আছে। পুনরায় চালু করতে পেমেন্ট ও সাবস্ক্রিপশন থেকে পেমেন্টের প্রমাণ জমা দিন, অথবা হেল্প ও সাপোর্টে যোগাযোগ করুন।",
+  },
+  merchantPaymentDue: {
+    en: "Your monthly payment is due. Pay it to add or edit products again.",
+    bn: "আপনার মাসিক পেমেন্ট বাকি আছে। আবার পণ্য যোগ বা সম্পাদনা করতে পেমেন্ট করুন।",
+  },
+  merchantAwaitingPayment: {
+    en: "Your account is approved. Pay your first monthly subscription to start adding products.",
+    bn: "আপনার অ্যাকাউন্ট অনুমোদিত হয়েছে। পণ্য যোগ করা শুরু করতে প্রথম মাসের সাবস্ক্রিপশন পরিশোধ করুন।",
+  },
+  merchantProductSubmitted: {
+    en: "Product submitted. It will appear on the website after approval.",
+    bn: "পণ্য জমা হয়েছে। অনুমোদনের পর এটি ওয়েবসাইটে দেখা যাবে।",
+  },
+  merchantProductResubmitted: {
+    en: "Product updated and sent for approval again",
+    bn: "পণ্য হালনাগাদ হয়েছে এবং আবার অনুমোদনের জন্য পাঠানো হয়েছে",
+  },
+  productApproved: { en: "Product approved and now visible on the website", bn: "পণ্য অনুমোদিত হয়েছে এবং এখন ওয়েবসাইটে দেখা যাচ্ছে" },
+  productRejected: { en: "Product rejected", bn: "পণ্য বাতিল করা হয়েছে" },
+  stockInvalid: { en: "Stock must be a whole number of 0 or more", bn: "স্টক ০ বা তার বেশি পূর্ণ সংখ্যা হতে হবে" },
+  outOfStock: (title, left) => ({
+    en: left > 0 ? `Only ${left} left of "${title}". Reduce the quantity and try again.` : `"${title}" is out of stock`,
+    bn: left > 0 ? `"${title}" মাত্র ${left} টি আছে। পরিমাণ কমিয়ে আবার চেষ্টা করুন।` : `"${title}" স্টকে নেই`,
+  }),
+  merchantOrderStatusInvalid: {
+    en: "That status change is not allowed for this order",
+    bn: "এই অর্ডারের জন্য এই অবস্থা পরিবর্তন অনুমোদিত নয়",
+  },
+  merchantOrderUnderReview: {
+    en: "N H Shop is still verifying this order. Wait before confirming it.",
+    bn: "এন এইচ শপ এখনও এই অর্ডারটি যাচাই করছে। নিশ্চিত করার আগে অপেক্ষা করুন।",
+  },
+
+  // ---- merchant payment proofs ----
+  billingFetched: { en: "Subscription details fetched", bn: "সাবস্ক্রিপশনের তথ্য আনা হয়েছে" },
+  paymentProofInvalid: {
+    en: "Choose the payment method and enter the amount you sent and the transaction ID",
+    bn: "পেমেন্ট মাধ্যম নির্বাচন করুন এবং পাঠানো টাকার পরিমাণ ও ট্রানজেকশন আইডি লিখুন",
+  },
+  paymentProofScreenshotRequired: { en: "Upload a screenshot of the payment", bn: "পেমেন্টের একটি স্ক্রিনশট আপলোড করুন" },
+  paymentProofPending: {
+    en: "You already have a payment waiting for verification. Wait for it to be checked before submitting another.",
+    bn: "আপনার একটি পেমেন্ট যাচাইয়ের অপেক্ষায় আছে। আরেকটি জমা দেওয়ার আগে সেটি যাচাই হওয়া পর্যন্ত অপেক্ষা করুন।",
+  },
+  paymentProofDuplicate: {
+    en: "This transaction ID has already been submitted",
+    bn: "এই ট্রানজেকশন আইডি ইতিমধ্যে জমা দেওয়া হয়েছে",
+  },
+  paymentProofSubmitted: {
+    en: "Payment proof submitted. Your account will be activated after N H Shop verifies it.",
+    bn: "পেমেন্টের প্রমাণ জমা হয়েছে। এন এইচ শপ যাচাই করার পর আপনার অ্যাকাউন্ট সক্রিয় হবে।",
+  },
+  paymentProofsFetched: { en: "Payment proofs fetched", bn: "পেমেন্টের প্রমাণের তালিকা আনা হয়েছে" },
+  paymentProofNotFound: { en: "Payment proof not found", bn: "পেমেন্টের প্রমাণ পাওয়া যায়নি" },
+  paymentProofDecided: {
+    en: "This payment proof has already been decided",
+    bn: "এই পেমেন্টের প্রমাণের সিদ্ধান্ত ইতিমধ্যে নেওয়া হয়েছে",
+  },
+  paymentProofApproved: {
+    en: "Payment approved. Press Activate account to start the new subscription period.",
+    bn: "পেমেন্ট অনুমোদিত হয়েছে। নতুন সাবস্ক্রিপশন শুরু করতে অ্যাকাউন্ট সক্রিয় করুন চাপুন।",
+  },
+  paymentProofRejected: { en: "Payment rejected and the merchant informed", bn: "পেমেন্ট বাতিল করা হয়েছে এবং মার্চেন্টকে জানানো হয়েছে" },
+  paymentProofReasonRequired: {
+    en: "Write the reason so the merchant knows what to fix",
+    bn: "কারণ লিখুন, যাতে মার্চেন্ট বুঝতে পারেন কী ঠিক করতে হবে",
+  },
+  paymentProofNotApproved: {
+    en: "Approve the payment before activating the account",
+    bn: "অ্যাকাউন্ট সক্রিয় করার আগে পেমেন্ট অনুমোদন করুন",
+  },
+  merchantActivated: { en: "Account activated and the new subscription period started", bn: "অ্যাকাউন্ট সক্রিয় হয়েছে এবং নতুন সাবস্ক্রিপশন শুরু হয়েছে" },
+
+  merchantProductNotDeletable: {
+    en: "Merchant products are kept permanently. Reject the product instead, or suspend the merchant to hide all of their products.",
+    bn: "মার্চেন্টের পণ্য স্থায়ীভাবে সংরক্ষিত থাকে। এর বদলে পণ্যটি বাতিল করুন, অথবা সব পণ্য লুকাতে মার্চেন্টকে স্থগিত করুন।",
+  },
+
+  // ---- support tickets ----
+  ticketsFetched: { en: "Support requests fetched", bn: "সাপোর্ট অনুরোধের তালিকা আনা হয়েছে" },
+  ticketFetched: { en: "Support request fetched", bn: "সাপোর্ট অনুরোধ আনা হয়েছে" },
+  ticketNotFound: { en: "Support request not found", bn: "সাপোর্ট অনুরোধ পাওয়া যায়নি" },
+  ticketInvalid: {
+    en: "Write a subject and describe the problem",
+    bn: "একটি বিষয় লিখুন এবং সমস্যার বিবরণ দিন",
+  },
+  ticketMessageRequired: {
+    en: "Write a message or attach a picture or voice recording",
+    bn: "একটি বার্তা লিখুন অথবা ছবি বা ভয়েস রেকর্ডিং যুক্ত করুন",
+  },
+  ticketTooManyOpen: {
+    en: "You have too many open support requests. Reply in an existing one instead.",
+    bn: "আপনার অনেকগুলো সাপোর্ট অনুরোধ খোলা আছে। নতুনটির বদলে আগেরটিতে উত্তর দিন।",
+  },
+  ticketTooLong: {
+    en: "This conversation is too long. Please open a new support request.",
+    bn: "এই কথোপকথনটি অনেক বড় হয়ে গেছে। অনুগ্রহ করে নতুন সাপোর্ট অনুরোধ খুলুন।",
+  },
+  ticketCreated: { en: "Support request sent. We will reply here.", bn: "সাপোর্ট অনুরোধ পাঠানো হয়েছে। আমরা এখানেই উত্তর দেব।" },
+  ticketReplied: { en: "Reply sent", bn: "উত্তর পাঠানো হয়েছে" },
+  ticketUpdated: { en: "Support request updated", bn: "সাপোর্ট অনুরোধ হালনাগাদ হয়েছে" },
+  ticketStatusInvalid: { en: "Choose Open, In progress or Resolved", bn: "খোলা, চলমান অথবা সমাধান হয়েছে নির্বাচন করুন" },
+
+  // ---- uploads ----
+  attachmentInvalidType: {
+    en: "Only PNG, JPEG or WebP pictures and MP3, M4A, WAV, OGG or WebM audio are allowed",
+    bn: "শুধুমাত্র PNG, JPEG বা WebP ছবি এবং MP3, M4A, WAV, OGG বা WebM অডিও আপলোড করা যাবে",
+  },
+  attachmentTooLarge: {
+    en: "Pictures can be up to 5 MB and audio up to 10 MB",
+    bn: "ছবি সর্বোচ্চ ৫ এমবি এবং অডিও সর্বোচ্চ ১০ এমবি হতে পারে",
+  },
+  attachmentTooMany: {
+    en: "Attach up to 3 pictures and 1 audio file",
+    bn: "সর্বোচ্চ ৩টি ছবি এবং ১টি অডিও ফাইল যুক্ত করা যাবে",
+  },
+
+  // ---- notifications and audit ----
+  notificationsFetched: { en: "Notifications fetched", bn: "নোটিফিকেশন আনা হয়েছে" },
+  notificationsRead: { en: "Notifications marked as read", bn: "নোটিফিকেশন পড়া হয়েছে হিসেবে চিহ্নিত" },
+  auditFetched: { en: "Audit log fetched", bn: "অডিট লগ আনা হয়েছে" },
 
   // ---- misc ----
   visitRecorded: { en: "Visit recorded", bn: "ভিজিট রেকর্ড করা হয়েছে" },

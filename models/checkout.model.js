@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const { preventDeletion } = require("../utils/retention");
+
 const { Schema } = mongoose;
 
 /**
@@ -31,6 +33,25 @@ const orderItemSchema = new Schema(
     quntity: { type: Number, default: 1, min: 1 },
     unitprice: { type: Number, default: 0, min: 0 },
     totalprice: { type: Number, default: 0, min: 0 },
+    // Who sells this line; `null` for the store's own products.
+    merchant: { type: mongoose.Types.ObjectId, ref: "Merchant", default: null },
+    // True while this line holds units out of the product's stock.
+    stockDeducted: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+/** One merchant's progress on their own lines of an order. */
+const merchantStatusSchema = new Schema(
+  {
+    merchant: { type: mongoose.Types.ObjectId, ref: "Merchant", required: true },
+    status: {
+      type: String,
+      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+      default: "pending",
+    },
+    note: { type: String, trim: true, default: "" },
+    updatedAt: { type: Date, default: Date.now },
   },
   { _id: false }
 );
@@ -54,6 +75,10 @@ const orderSchema = new Schema(
     customer: { type: customerSchema, required: true },
     shipping: { type: customerSchema, required: true },
     items: { type: [orderItemSchema], default: [] },
+    // Every merchant with a line in this order, so each one finds their orders
+    // with one indexed query and never sees anyone else's.
+    merchants: { type: [{ type: mongoose.Types.ObjectId, ref: "Merchant" }], default: [], index: true },
+    merchantStatus: { type: [merchantStatusSchema], default: [] },
 
     subtotal: { type: Number, default: 0, min: 0 },
     deliveryZone: { type: String, default: "inside_dhaka" },
@@ -105,5 +130,7 @@ const orderSchema = new Schema(
 
 orderSchema.index({ "customer.phone": 1, createdAt: -1 });
 orderSchema.index({ ipAddress: 1, createdAt: -1 });
+// Orders are cancelled, never deleted, so a merchant's history survives a suspension.
+preventDeletion(orderSchema, "Order");
 
 module.exports = mongoose.model("Order", orderSchema);

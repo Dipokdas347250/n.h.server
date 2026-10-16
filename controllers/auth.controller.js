@@ -1,12 +1,14 @@
 const fs = require("fs");
 const bcrypt = require("bcrypt");
 const userModel = require("../models/user.model");
+const merchantModel = require("../models/merchant.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const sendEmail = require("../helpers/sendEmail");
 const otpNumber = require("../helpers/otp");
 const { vaildEmail } = require("../helpers/vaildEmail");
 const messages = require("../utils/messages");
+const { normalizePhone, isValidBdPhone } = require("../utils/fraudCheck");
 const cloudinary = require("../utils/cloudinary");
 // Shared with the email template so the quoted expiry always matches the real one.
 const { OTP_EXPIRY_MS } = require("../config/mail.config");
@@ -92,9 +94,19 @@ exports.dashboardStatusController = asyncHandler(async (req, res) => {
  */
 exports.loginController = asyncHandler(async (req, res) => {
   const { email, password, scope } = req.body || {};
-  if (!vaildEmail(email || "")) return apiResponse(res, 400, messages.invalidEmail);
-
-  const loginUser = await userModel.findOne({ email: String(email).trim().toLowerCase() });
+  const identifier = String(email || "").trim();
+  let loginUser;
+  if (vaildEmail(identifier)) {
+    loginUser = await userModel.findOne({ email: identifier.toLowerCase() });
+  } else if (scope === "dashboard" && isValidBdPhone(normalizePhone(identifier))) {
+    // Merchants may sign in to the dashboard with their mobile number. If two
+    // merchant accounts share it, the email is needed to tell them apart.
+    const matches = await userModel.find({ phone: normalizePhone(identifier), role: "merchant" }).limit(2);
+    if (matches.length > 1) return apiResponse(res, 409, messages.phoneLoginAmbiguous);
+    loginUser = matches[0];
+  } else {
+    return apiResponse(res, 400, messages.invalidEmail);
+  }
   if (!loginUser) return apiResponse(res, 404, messages.emailNotFound);
   if (!loginUser.verified) return apiResponse(res, 403, messages.notVerified);
 
@@ -102,7 +114,12 @@ exports.loginController = asyncHandler(async (req, res) => {
   if (!matches) return apiResponse(res, 401, messages.invalidPassword);
 
   // Checked after the password so the dashboard does not reveal which emails belong to shoppers.
-  if (scope === "dashboard" && loginUser.role !== "admin") return apiResponse(res, 403, messages.noDashboardAccess);
+  if (scope === "dashboard" && !["admin", "merchant"].includes(loginUser.role)) {
+    return apiResponse(res, 403, messages.noDashboardAccess);
+  }
+  if (loginUser.role === "merchant" && (await merchantModel.exists({ user: loginUser._id, locked: true }))) {
+    return apiResponse(res, 403, messages.merchantLocked);
+  }
 
   req.session.cookie.maxAge = SESSION_TTL_MS;
   req.session.user = { ...publicUser(loginUser), login: true };
@@ -171,7 +188,8 @@ exports.updateProfileController = asyncHandler(async (req, res) => {
   // The email is the sign-in name, so changing it needs the current password.
   if (email !== undefined) {
     const nextEmail = String(email).trim().toLowerCase();
-    if (nextEmail !== user.email) {
+    // A merchant without an email leaves the field blank: that is no change.
+    if (nextEmail !== (user.email || "")) {
       if (!vaildEmail(nextEmail)) return apiResponse(res, 400, messages.invalidEmail);
       if (!currentPassword) return apiResponse(res, 400, messages.currentPasswordRequired);
       if (!(await bcrypt.compare(String(currentPassword), user.password))) {
@@ -185,7 +203,20 @@ exports.updateProfileController = asyncHandler(async (req, res) => {
   }
 
   if (fullname !== undefined && String(fullname).trim()) user.fullname = String(fullname).trim();
-  if (phone !== undefined) user.phone = String(phone).trim();
+  if (phone !== undefined && String(phone).trim() !== (user.phone || "")) {
+    // For a merchant without an email the mobile number is the sign-in name.
+    if (user.role === "merchant" && !user.email) {
+      const nextPhone = normalizePhone(phone);
+      if (!isValidBdPhone(nextPhone)) return apiResponse(res, 400, messages.invalidPhone);
+      if (!currentPassword || !(await bcrypt.compare(String(currentPassword), user.password))) {
+        return apiResponse(res, 401, messages.invalidPassword);
+      }
+      if (await userModel.exists({ phone: nextPhone, role: "merchant", _id: { $ne: user._id } })) return apiResponse(res, 409, messages.merchantPhoneInUse);
+      user.phone = nextPhone;
+    } else {
+      user.phone = String(phone).trim();
+    }
+  }
   if (address !== undefined) user.Adderss = String(address).trim();
   if (password) {
     if (String(password).length < 8) return apiResponse(res, 400, messages.signupInvalid);

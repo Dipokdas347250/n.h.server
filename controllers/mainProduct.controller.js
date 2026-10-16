@@ -8,9 +8,11 @@ const cloudinary = require("../utils/cloudinary");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const messages = require("../utils/messages");
+const merchantModel = require("../models/merchant.model");
+const { publicProductFilter } = require("../utils/merchant");
 
 /** Pushes every uploaded image to Cloudinary and removes the local temp file. */
-const uploadProductImages = async (files = []) =>
+const uploadProductImages = exports.uploadProductImages = async (files = []) =>
   Promise.all(files.map(async (file) => {
     const result = await cloudinary.uploader.upload(file.path, { folder: "nh-shop/products" });
     fs.unlink(file.path, () => {});
@@ -18,7 +20,7 @@ const uploadProductImages = async (files = []) =>
   }));
 
 /** Slug that stays unique even when two products share a title. */
-const buildSlug = async (title, ignoreId) => {
+const buildSlug = exports.buildSlug = async (title, ignoreId) => {
   const base = slugify(title, { replacement: "-", lower: true, trim: true }) || "product";
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
@@ -26,6 +28,16 @@ const buildSlug = async (title, ignoreId) => {
     if (!clash || String(clash._id) === String(ignoreId)) return candidate;
   }
   return `${base}-${Date.now()}`;
+};
+
+/**
+ * Stock from a form field: blank means "not tracked" (`null`), otherwise a
+ * whole number of 0 or more. Returns `undefined` when the value is invalid.
+ */
+exports.parseStock = (value) => {
+  if (value === "" || value === null || value === "null") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 };
 
 const POPULATE = [
@@ -40,6 +52,12 @@ const withRating = (product) => {
   const reviews = plain.review || [];
   const total = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
   return { ...plain, rating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0 };
+};
+
+/** What the storefront may see: no trace of which merchant sells it or how it was reviewed. */
+const publicProduct = (product) => {
+  const { merchant, approvalStatus, rejectionReason, reviewedBy, reviewedAt, ...rest } = withRating(product);
+  return rest;
 };
 
 exports.allMainProductController = asyncHandler(async (req, res) => {
@@ -57,6 +75,8 @@ exports.allMainProductController = asyncHandler(async (req, res) => {
   if (discountPrice !== undefined && (!Number.isFinite(discountPrice) || discountPrice < 0 || discountPrice > price)) {
     return apiResponse(res, 400, messages.discountRange);
   }
+  const stock = exports.parseStock(req.body.stock ?? "");
+  if (stock === undefined) return apiResponse(res, 400, messages.stockInvalid);
 
   let variantInput = [];
   try {
@@ -76,6 +96,7 @@ exports.allMainProductController = asyncHandler(async (req, res) => {
     discountPrice,
     offer: String(req.body.offer || "").trim(),
     sku: String(req.body.sku || "").trim(),
+    stock,
     category: category._id,
     variantType: variantInput.length ? "multivariant" : "singlevariant",
     image: uploaded.map((file) => file.url),
@@ -102,7 +123,7 @@ exports.updateProductController = asyncHandler(async (req, res) => {
   const product = await productModel.findById(req.params.id);
   if (!product) return apiResponse(res, 404, messages.productNotFound);
 
-  const { title, description, price, discountPrice, offer, sku, category } = req.body;
+  const { title, description, price, discountPrice, offer, sku, category, stock } = req.body;
 
   if (title !== undefined && String(title).trim()) {
     product.title = String(title).trim();
@@ -123,6 +144,11 @@ exports.updateProductController = asyncHandler(async (req, res) => {
   }
   if (offer !== undefined) product.offer = String(offer).trim();
   if (sku !== undefined) product.sku = String(sku).trim();
+  if (stock !== undefined) {
+    const parsed = exports.parseStock(stock);
+    if (parsed === undefined) return apiResponse(res, 400, messages.stockInvalid);
+    product.stock = parsed;
+  }
   if (category) {
     if (!(await categoryModel.exists({ _id: category }))) return apiResponse(res, 400, messages.categoryRequired);
     product.category = category;
@@ -143,6 +169,9 @@ exports.updateProductController = asyncHandler(async (req, res) => {
 exports.deleteProductController = asyncHandler(async (req, res) => {
   const product = await productModel.findById(req.params.id);
   if (!product) return apiResponse(res, 404, messages.productNotFound);
+  // A merchant's products, photos and reviews are their records: they can be
+  // rejected or hidden, never deleted.
+  if (product.merchant) return apiResponse(res, 409, messages.merchantProductNotDeletable);
 
   await Promise.all((product.imageIds || []).map((publicId) => cloudinary.uploader.destroy(publicId).catch(() => {})));
   await Promise.all([
@@ -155,33 +184,69 @@ exports.deleteProductController = asyncHandler(async (req, res) => {
 });
 
 exports.allProductController = asyncHandler(async (req, res) => {
-  const products = await productModel.find({}).sort({ createdAt: -1 }).populate(POPULATE);
-  apiResponse(res, 200, messages.productsFetched, products.map(withRating));
+  const products = await productModel.find(await publicProductFilter()).sort({ createdAt: -1 }).populate(POPULATE);
+  apiResponse(res, 200, messages.productsFetched, products.map(publicProduct));
+});
+
+/**
+ * Every product for the administrator's product list, including ones customers
+ * cannot see, each with `visibility`: "public", or why it is hidden —
+ * "pending", "rejected", "hidden" (by the merchant), "merchant_suspended" or
+ * "merchant_locked". A product's own state is never changed by a suspension,
+ * so on reactivation exactly the products that were live before come back.
+ */
+exports.adminAllProductsController = asyncHandler(async (req, res) => {
+  const [products, merchants] = await Promise.all([
+    productModel.find({}).sort({ createdAt: -1 }).populate(POPULATE).lean(),
+    merchantModel.find({}).select("name status locked").lean(),
+  ]);
+  const merchantsById = new Map(merchants.map((merchant) => [String(merchant._id), merchant]));
+
+  apiResponse(
+    res,
+    200,
+    messages.productsFetched,
+    products.map((product) => {
+      const merchant = product.merchant ? merchantsById.get(String(product.merchant)) : null;
+      let visibility = "public";
+      if (merchant?.locked) visibility = "merchant_locked";
+      else if (merchant?.status === "suspended") visibility = "merchant_suspended";
+      else if (["pending", "rejected"].includes(product.approvalStatus)) visibility = product.approvalStatus;
+      else if (product.listingStatus === "hidden") visibility = "hidden";
+      return { ...withRating(product), merchant: merchant ? { _id: merchant._id, name: merchant.name, status: merchant.status, locked: merchant.locked } : null, visibility };
+    })
+  );
 });
 
 exports.topSellingProductController = asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 24);
-  const products = await require("./admin.controller").getTopSellingProducts(limit);
-  apiResponse(res, 200, messages.productsFetched, products);
+  const products = await require("./admin.controller").getTopSellingProducts(limit, { publicOnly: true });
+  apiResponse(res, 200, messages.productsFetched, products.map(({ merchant, approvalStatus, rejectionReason, reviewedBy, reviewedAt, ...rest }) => rest));
 });
 
 exports.categoryProductsController = asyncHandler(async (req, res) => {
   const category = await categoryModel.findOne({ slug: req.params.slug }).select("_id name slug image discount");
   if (!category) return apiResponse(res, 404, messages.categoryNotFound);
 
-  const products = await productModel.find({ category: category._id }).sort({ createdAt: -1 }).populate(POPULATE);
-  apiResponse(res, 200, messages.productsFetched, { category, products: products.map(withRating) });
+  const products = await productModel
+    .find({ category: category._id, ...(await publicProductFilter()) })
+    .sort({ createdAt: -1 })
+    .populate(POPULATE);
+  apiResponse(res, 200, messages.productsFetched, { category, products: products.map(publicProduct) });
 });
 
 exports.singleProductController = asyncHandler(async (req, res) => {
-  const product = await productModel.findOne({ slug: req.params.slug }).populate(POPULATE);
+  const product = await productModel.findOne({ slug: req.params.slug, ...(await publicProductFilter()) }).populate(POPULATE);
   if (!product) return apiResponse(res, 404, messages.productNotFound);
-  apiResponse(res, 200, messages.productsFetched, withRating(product));
+  apiResponse(res, 200, messages.productsFetched, publicProduct(product));
 });
 
 /** Product detail by database id, used by links that carry the id in the URL. */
 exports.productByIdController = asyncHandler(async (req, res) => {
-  const product = await productModel.findById(req.params.id).populate(POPULATE);
+  const product = await productModel.findOne({ _id: req.params.id, ...(await publicProductFilter()) }).populate(POPULATE);
   if (!product) return apiResponse(res, 404, messages.productNotFound);
-  apiResponse(res, 200, messages.productsFetched, withRating(product));
+  apiResponse(res, 200, messages.productsFetched, publicProduct(product));
 });
+
+exports.POPULATE = POPULATE;
+exports.withRating = withRating;
