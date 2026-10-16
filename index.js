@@ -11,11 +11,19 @@ const { globalerrorhandler } = require("./utils/globalerror");
 const { uploadDir } = require("./utils/upload");
 const { apiResponse } = require("./utils/apiResponse");
 const messages = require("./utils/messages");
+const mongoose = require("mongoose");
+const { startMerchantBillingJob } = require("./utils/merchant");
+const { runMigrations } = require("./utils/migrations");
 
 const app = express();
 const port = process.env.PORT || 8080;
 const isProduction = process.env.NODE_ENV === "production";
 
+// Once the database is up: bring older data up to date, then start the
+// scheduled subscription check (expiry reminders, payment due, suspension).
+mongoose.connection.once("open", () => {
+  runMigrations().finally(() => startMerchantBillingJob());
+});
 dbconfig();
 
 // The storefront and the dashboard both send the session cookie, so every

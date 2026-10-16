@@ -9,6 +9,8 @@ const messages = require("../utils/messages");
 const { resolveDelivery } = require("../utils/delivery");
 const { evaluateOrder, normalizePhone, isValidBdPhone } = require("../utils/fraudCheck");
 const { parseDateRange } = require("../utils/dateRange");
+const { publicProductFilter } = require("../utils/merchant");
+const { reserveStock, releaseUnsavedStock, releaseStock } = require("../utils/stock");
 const { v4: uuidv4 } = require("uuid");
 
 const SSLCommerzPayment = require("sslcommerz-lts");
@@ -64,52 +66,49 @@ const buildCustomer = (body, user) => {
 /**
  * Turns whatever the browser sent into priced order lines.
  * Falls back to the signed-in customer's saved cart when no items are posted.
- * Prices always come from the database, never from the request body.
+ * Prices always come from the database, never from the request body, and only
+ * products the storefront may show can be bought. Each line remembers which
+ * merchant sells it, so the order reaches that merchant's dashboard.
  */
 const buildOrderItems = async (items, userId) => {
+  let requested = [];
   if (Array.isArray(items) && items.length) {
-    const requestedIds = items.map((item) => item.product).filter(Boolean);
-    const products = await productModel.find({ _id: { $in: requestedIds } });
-    const byId = new Map(products.map((product) => [String(product._id), product]));
-
-    return items
-      .map((item) => {
-        const product = byId.get(String(item.product));
-        if (!product) return null;
-        const quantity = Math.max(Math.trunc(Number(item.quantity ?? item.quntity ?? 1)) || 1, 1);
-        const unitprice = getProductPrice(product);
-        return {
-          product: product._id,
-          variant: item.variant || undefined,
-          title: product.title,
-          image: product.image?.[0] || "",
-          quntity: quantity,
-          unitprice,
-          totalprice: unitprice * quantity,
-        };
-      })
-      .filter(Boolean);
+    requested = items.map((item) => ({ product: item.product, variant: item.variant, quantity: item.quantity ?? item.quntity }));
+  } else if (userId) {
+    const cart = await cartModel.find({ user: userId }).select("product variant quntity").lean();
+    requested = cart.map((line) => ({ product: line.product, variant: line.variant, quantity: line.quntity }));
   }
 
-  if (!userId) return [];
+  const requestedIds = requested.map((item) => item.product).filter(Boolean);
+  if (!requestedIds.length) return [];
 
-  const cart = await cartModel.find({ user: userId }).populate("product");
-  return cart
-    .filter((line) => line.product)
-    .map((line) => {
-      const quantity = Math.max(Number(line.quntity) || 1, 1);
-      const unitprice = getProductPrice(line.product);
+  const products = await productModel.find({ _id: { $in: requestedIds }, ...(await publicProductFilter()) });
+  const byId = new Map(products.map((product) => [String(product._id), product]));
+
+  return requested
+    .map((item) => {
+      const product = byId.get(String(item.product));
+      if (!product) return null;
+      const quantity = Math.max(Math.trunc(Number(item.quantity ?? 1)) || 1, 1);
+      const unitprice = getProductPrice(product);
       return {
-        product: line.product._id,
-        variant: line.variant || undefined,
-        title: line.product.title,
-        image: line.product.image?.[0] || "",
+        product: product._id,
+        variant: item.variant || undefined,
+        title: product.title,
+        image: product.image?.[0] || "",
         quntity: quantity,
         unitprice,
         totalprice: unitprice * quantity,
+        merchant: product.merchant || null,
       };
-    });
+    })
+    .filter(Boolean);
 };
+
+/** The distinct merchants selling lines of an order. */
+const merchantsOf = (items) => [
+  ...new Map(items.filter((item) => item.merchant).map((item) => [String(item.merchant), item.merchant])).values(),
+];
 
 /**
  * Counts of past behaviour for this phone number and IP, used by the fraud
@@ -182,6 +181,8 @@ exports.checkoutController = asyncHandler(async (req, res) => {
     customer,
     shipping: customer,
     items: orderItems,
+    merchants: merchantsOf(orderItems),
+    merchantStatus: merchantsOf(orderItems).map((merchant) => ({ merchant })),
     subtotal,
     deliveryZone: delivery.zone.key,
     deliveryZoneLabel: delivery.zone.label,
@@ -210,17 +211,27 @@ exports.checkoutController = asyncHandler(async (req, res) => {
     });
   }
 
+  const reserved = await reserveStock(order.items);
+  if (!reserved.ok) {
+    return apiResponse(res, 409, messages.outOfStock(reserved.product.title, reserved.product.stock));
+  }
+
   if (paymentMethod === "online") {
     order.transaction_id = uuidv4().replace(/-/g, "").slice(0, 20);
     const gatewayUrl = await startOnlinePayment(order, customer);
-    if (!gatewayUrl) return apiResponse(res, 502, messages.paymentGatewayUnavailable);
+    if (!gatewayUrl) {
+      await releaseUnsavedStock(order.items);
+      return apiResponse(res, 502, messages.paymentGatewayUnavailable);
+    }
     order.gatewayUrl = gatewayUrl;
   }
 
   await order.save();
   if (user?._id) await cartModel.deleteMany({ user: user._id });
 
-  apiResponse(res, 201, messages.orderPlaced, order);
+  const { merchants, merchantStatus, ...placed } = order.toObject();
+  placed.items = placed.items.map(({ merchant, stockDeducted, ...item }) => item);
+  apiResponse(res, 201, messages.orderPlaced, placed);
 });
 
 /** Opens an SSLCommerz session and returns the hosted payment page URL. */
@@ -284,7 +295,12 @@ exports.paymentFailController = asyncHandler(async (req, res) => {
 
 exports.paymentCancelController = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  if (id) await checkoutModel.findOneAndUpdate({ transaction_id: id }, { paymentStatus: "unpaid", deliveryStatus: "cenceled" });
+  const order = id ? await checkoutModel.findOne({ transaction_id: id }) : null;
+  if (order && order.deliveryStatus !== "cenceled") {
+    order.set({ paymentStatus: "unpaid", deliveryStatus: "cenceled" });
+    await order.save();
+    await releaseStock(order._id);
+  }
   res.redirect(`${storeUrl}/checkout?payment=cancelled`);
 });
 
@@ -309,6 +325,7 @@ exports.getallordersController = asyncHandler(async (req, res) => {
   if (req.query.fraudStatus) query.fraudStatus = String(req.query.fraudStatus);
   if (req.query.deliveryStatus) query.deliveryStatus = String(req.query.deliveryStatus);
   if (req.query.riskLevel) query.riskLevel = String(req.query.riskLevel);
+  if (req.query.merchant) query.merchants = String(req.query.merchant);
 
   const range = parseDateRange(req.query);
   if (range) query.createdAt = { $gte: range.start, $lt: range.end };
@@ -317,7 +334,9 @@ exports.getallordersController = asyncHandler(async (req, res) => {
     .find(query)
     .sort({ createdAt: -1 })
     .populate({ path: "user", select: "fullname email phone" })
-    .populate({ path: "items.product", select: "title image price" });
+    .populate({ path: "items.product", select: "title image price" })
+    .populate({ path: "items.merchant", select: "name phone" })
+    .populate({ path: "merchantStatus.merchant", select: "name" });
 
   apiResponse(res, 200, messages.ordersFetched, orders);
 });
@@ -327,7 +346,7 @@ exports.myOrdersController = asyncHandler(async (req, res) => {
   const orders = await checkoutModel
     .find({ user: req.session.user._id })
     .sort({ createdAt: -1 })
-    .select("-riskFlags -ipAddress -userAgent -riskScore -riskLevel");
+    .select("-riskFlags -ipAddress -userAgent -riskScore -riskLevel -merchants -merchantStatus -items.merchant -items.stockDeducted");
   apiResponse(res, 200, messages.ordersFetched, orders);
 });
 
@@ -339,7 +358,7 @@ exports.trackOrderController = asyncHandler(async (req, res) => {
 
   const order = await checkoutModel
     .findOne({ orderNumber, "customer.phone": phone })
-    .select("-riskFlags -ipAddress -userAgent -riskScore -riskLevel");
+    .select("-riskFlags -ipAddress -userAgent -riskScore -riskLevel -merchants -merchantStatus -items.merchant -items.stockDeducted");
   if (!order) return apiResponse(res, 404, messages.orderNotFound);
 
   apiResponse(res, 200, messages.orderFetched, order);

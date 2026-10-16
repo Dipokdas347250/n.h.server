@@ -13,6 +13,7 @@ const checkout = require('./checkout')
 const admin = require('./admin')
 const video = require('./video')
 const settings = require('./settings')
+const merchant = require('./merchant')
 
 
 
@@ -31,5 +32,6 @@ router.use("/checkout", checkout)
 router.use("/admin", admin)
 router.use("/video", video)
 router.use("/settings", settings)
+router.use("/merchant", merchant)
 
 module.exports = router;

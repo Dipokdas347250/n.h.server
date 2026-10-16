@@ -3,6 +3,7 @@ const productModel = require("../models/product.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const messages = require("../utils/messages");
+const { publicProductFilter } = require("../utils/merchant");
 
 const getProductPrice = (product) =>
   Number(product?.discountPrice ?? product?.diccountprice ?? product?.price ?? 0);
@@ -18,7 +19,8 @@ exports.addCartController = asyncHandler(async (req, res) => {
   const { variant, quntity, product } = req.body || {};
   const user = req.session.user._id;
 
-  const productData = await productModel.findById(product);
+  // Only products the storefront shows can go in a cart.
+  const productData = await productModel.findOne({ _id: product, ...(await publicProductFilter()) });
   if (!productData) return apiResponse(res, 404, messages.productNotFound);
   if (productData.variantType === "multivariant" && !variant) {
     return apiResponse(res, 400, messages.variantRequired);
@@ -49,11 +51,13 @@ exports.singleCartController = asyncHandler(async (req, res) => {
   // A customer may only read their own cart.
   const cart = await cartModel
     .find({ user: req.session.user._id })
-    .populate({ path: "product", select: "title slug price discountPrice diccountprice image variantType" })
+    .populate({ path: "product", select: "title slug price discountPrice diccountprice image variantType", match: await publicProductFilter() })
     .populate({ path: "variant" })
     .select("-updatedAt -createdAt");
 
-  apiResponse(res, 200, messages.cartFetched, cart);
+  // Lines whose product is hidden (e.g. its merchant was suspended) are kept,
+  // and come back by themselves when the product is visible again.
+  apiResponse(res, 200, messages.cartFetched, cart.filter((line) => line.product));
 });
 
 exports.removeCartController = asyncHandler(async (req, res) => {

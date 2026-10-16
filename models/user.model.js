@@ -6,10 +6,11 @@ const userSchema = new mongoose.Schema({
         required: [true, 'Name is required'],
         trim:true
     },
+    // Required for everyone except merchants, who may sign in with their
+    // mobile number instead. Unique whenever present (index below).
     email: {
         type: String,
-        required: [true, 'Email is required'],
-        unique: [true,"email already in use"],
+        required: [function () { return this.role !== "merchant"; }, 'Email is required'],
     },
     password: {
         type: String,
@@ -20,7 +21,7 @@ const userSchema = new mongoose.Schema({
     },
     role:{
         type: String,
-        enum: ['user', 'admin','subadmin'],
+        enum: ['user', 'admin','subadmin','merchant'],
         default: 'user',
     },
     Adderss:{
@@ -58,5 +59,15 @@ const userSchema = new mongoose.Schema({
 
 
 
+
+// Email is unique whenever it is set. Merchants without an email leave the
+// field out entirely (never ""), so any number of them can exist. The old
+// plain unique index is replaced by utils/migrations.js.
+userSchema.index(
+    { email: 1 },
+    { unique: true, name: "email_unique_when_present", partialFilterExpression: { email: { $type: "string" } } }
+);
+// Merchants may sign in with their mobile number.
+userSchema.index({ phone: 1 });
 
 module.exports = mongoose.model("User", userSchema)
