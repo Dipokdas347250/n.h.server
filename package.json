@@ -7,7 +7,8 @@
     "start": "nodemon index.js",
     "dev": "nodemon index.js",
     "mail:test": "node scripts/testMail.js",
-    "admin:create": "node scripts/createAdmin.js"
+    "admin:create": "node scripts/createAdmin.js",
+    "test:acceptance": "node --test --test-concurrency=1 tests/acceptance.test.js"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,10 @@
     "otp-generator": "^4.0.1",
     "slugify": "^1.6.6",
     "sslcommerz-lts": "^1.2.0",
+    "tesseract.js": "^7.0.0",
     "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.4.3"
   }
 }

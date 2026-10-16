@@ -37,7 +37,7 @@ exports.adminSettingsController = asyncHandler(async (req, res) => {
 
 exports.updateSettingsController = asyncHandler(async (req, res) => {
   const settings = await Setting.getSettings();
-  const { deliveryZones, freeDeliveryThreshold, codMaxAmount, currency, fraud, metaPixelId, steadfast } = req.body || {};
+  const { deliveryZones, freeDeliveryThreshold, codMaxAmount, currency, fraud, metaPixelId, steadfast, merchantBilling } = req.body || {};
 
   if (Array.isArray(deliveryZones)) {
     const cleaned = deliveryZones
@@ -74,6 +74,22 @@ exports.updateSettingsController = asyncHandler(async (req, res) => {
     if (typeof steadfast.apiKey === "string" && steadfast.apiKey.trim()) settings.steadfast.apiKey = steadfast.apiKey.trim();
     if (typeof steadfast.secretKey === "string" && steadfast.secretKey.trim()) settings.steadfast.secretKey = steadfast.secretKey.trim();
     if (steadfast.autoSend !== undefined) settings.steadfast.autoSend = steadfast.autoSend === true || steadfast.autoSend === "true";
+  }
+
+  if (merchantBilling && typeof merchantBilling === "object") {
+    const days = (value, min, max) => {
+      const number = Number(value);
+      return Number.isInteger(number) && number >= min && number <= max ? number : undefined;
+    };
+    const periodDays = days(merchantBilling.periodDays, 1, 365);
+    const graceDays = days(merchantBilling.graceDays, 0, 60);
+    if (periodDays !== undefined) settings.merchantBilling.periodDays = periodDays;
+    if (graceDays !== undefined) settings.merchantBilling.graceDays = graceDays;
+    const defaultFee = Number(merchantBilling.defaultFee);
+    if (merchantBilling.defaultFee !== undefined && merchantBilling.defaultFee !== "" && Number.isFinite(defaultFee) && defaultFee >= 0) {
+      settings.merchantBilling.defaultFee = defaultFee;
+    }
+    if (typeof merchantBilling.instructions === "string") settings.merchantBilling.instructions = merchantBilling.instructions.trim().slice(0, 2000);
   }
 
   if (fraud && typeof fraud === "object") {

@@ -2,6 +2,7 @@ const orderModel = require("../models/checkout.model");
 const Setting = require("../models/setting.model");
 const asyncHandler = require("../utils/asyncHandler");
 const { apiResponse } = require("../utils/apiResponse");
+const { releaseStock } = require("../utils/stock");
 const messages = require("../utils/messages");
 const steadfast = require("../utils/steadfast");
 
@@ -133,8 +134,10 @@ exports.steadfastStatusController = asyncHandler(async (req, res) => {
     order.courier.checkedAt = new Date();
     // Keep our own delivery status in step with what the courier reports.
     if (["delivered", "partial_delivered"].includes(status)) order.deliveryStatus = "deliverd";
+    const cancelledNow = status === "cancelled" && order.deliveryStatus !== "cenceled";
     if (status === "cancelled") order.deliveryStatus = "cenceled";
     await order.save();
+    if (cancelledNow) await releaseStock(order._id);
     apiResponse(res, 200, messages.steadfastStatusFetched, order);
   } catch (error) {
     apiResponse(res, 502, courierFailure(error));

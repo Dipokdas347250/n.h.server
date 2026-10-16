@@ -193,4 +193,52 @@ const sendEmail = async (email, fullname, otp) => {
   }
 };
 
+/**
+ * A short bilingual account notice to a merchant (payment due, payment
+ * rejected, account activated, support reply). Same sender and transport as
+ * the verification email; `en` and `bn` are lists of plain-text lines.
+ */
+const sendNotice = async ({ to, name, subject, en = [], bn = [] }) => {
+  const { storeName, storeNameBn, supportEmail } = mailConfig;
+  const dashboardUrl = process.env.DASHBOARD_URL || "";
+  const greeting = `Hello ${String(name || "").trim() || "there"},`;
+  const text = [greeting, "", ...en, "", ...bn, "", dashboardUrl, supportEmail ? `Need help? ${supportEmail}` : ""].join("\n");
+  const paragraphs = (lines) =>
+    lines.map((line) => `<p style="margin:0 0 12px; font-size:15px; line-height:1.6; color:#374151;">${escapeHtml(line)}</p>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(subject)}</title></head>
+  <body style="margin:0; padding:24px 12px; background-color:#f4f7fb; font-family:Arial,Helvetica,sans-serif; color:#1f2937;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" align="center" style="max-width:600px; width:100%; background-color:#ffffff; border:1px solid #e5e7eb; border-radius:12px;">
+      <tr><td style="background-color:#062B63; padding:20px; text-align:center;">
+        <h1 style="margin:0; color:#ffffff; font-size:20px;">${escapeHtml(storeName)}</h1>
+        <p style="margin:4px 0 0; color:#c7d7f0; font-size:13px;">${escapeHtml(storeNameBn)}</p>
+      </td></tr>
+      <tr><td style="padding:28px 32px 12px;">
+        <p style="margin:0 0 16px; font-size:16px;">${escapeHtml(greeting)}</p>
+        ${paragraphs(en)}
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:20px 0;" />
+        ${paragraphs(bn)}
+        ${dashboardUrl ? `<p style="margin:16px 0 0; font-size:14px;"><a href="${escapeHtml(dashboardUrl)}" style="color:#16863D;">${escapeHtml(dashboardUrl)}</a></p>` : ""}
+      </td></tr>
+      <tr><td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:16px 32px; text-align:center; font-size:12px; color:#6b7280;">
+        ${supportEmail ? `Need help? ${escapeHtml(supportEmail)}` : `&copy; ${new Date().getFullYear()} ${escapeHtml(storeName)}`}
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+
+  return getTransporter().sendMail({
+    from: { name: storeName, address: process.env.AUTH_EMAIL },
+    to,
+    replyTo: supportEmail || undefined,
+    subject,
+    text,
+    html,
+    headers: { "X-Entity-Ref-ID": crypto.randomUUID(), "Auto-Submitted": "auto-generated" },
+  });
+};
+
 module.exports = sendEmail;
+module.exports.sendNotice = sendNotice;

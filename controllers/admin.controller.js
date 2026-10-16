@@ -7,6 +7,8 @@ const productModel = require("../models/product.model");
 const categoryModel = require("../models/categore.model");
 const visitModel = require("../models/visit.model");
 const { autoSendIfEnabled } = require("./courier.controller");
+const { VISIBLE_APPROVAL, hiddenMerchantIds } = require("../utils/merchant");
+const { releaseStock } = require("../utils/stock");
 const { parseUserAgent } = require("../utils/userAgent");
 const { TIMEZONE, DAY_MS, dhakaDateOf, todayInDhaka, parseDateRange } = require("../utils/dateRange");
 
@@ -16,14 +18,21 @@ const monthLabelsBn = ["জানু", "ফেব্রু", "মার্চ", 
 /** Orders that were never confirmed do not count as sales. */
 const SOLD_MATCH = { deliveryStatus: { $ne: "cenceled" }, fraudStatus: { $nin: ["blocked", "fake"] } };
 
-exports.getTopSellingProducts = async (limit = 8) => orderModel.aggregate([
+/**
+ * Best sellers by units sold. `publicOnly` drops products the storefront may not
+ * show (awaiting approval, rejected, or from a suspended or locked merchant).
+ */
+exports.getTopSellingProducts = async (limit = 8, { publicOnly = false } = {}) => orderModel.aggregate([
   { $match: SOLD_MATCH },
   { $unwind: "$items" },
   { $group: { _id: "$items.product", sold: { $sum: { $ifNull: ["$items.quntity", 1] } } } },
   { $sort: { sold: -1 } },
-  { $limit: limit },
   { $lookup: { from: productModel.collection.name, localField: "_id", foreignField: "_id", as: "product" } },
   { $unwind: "$product" },
+  ...(publicOnly
+    ? [{ $match: { "product.approvalStatus": VISIBLE_APPROVAL, "product.merchant": { $nin: await hiddenMerchantIds() } } }]
+    : []),
+  { $limit: limit },
   { $lookup: { from: categoryModel.collection.name, localField: "product.category", foreignField: "_id", as: "category" } },
   { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
   { $replaceRoot: { newRoot: { $mergeObjects: ["$product", { sold: "$sold", category: "$category" }] } } },
@@ -287,8 +296,19 @@ exports.updateOrderController = asyncHandler(async (req, res) => {
     if (fraudStatus === "fake") update.deliveryStatus = "cenceled";
   }
 
-  let order = await orderModel.findByIdAndUpdate(req.params.id, update, { new: true }).populate("user", "fullname email");
+  let order = await orderModel.findById(req.params.id);
   if (!order) return apiResponse(res, 404, messages.orderNotFound);
+
+  // Cancelling hands the reserved units back to stock.
+  const wasCancelled = order.deliveryStatus === "cenceled";
+  order.set(update);
+  await order.save();
+  if (!wasCancelled && order.deliveryStatus === "cenceled") await releaseStock(order._id);
+  await order.populate([
+    { path: "user", select: "fullname email" },
+    { path: "items.merchant", select: "name phone" },
+    { path: "merchantStatus.merchant", select: "name" },
+  ]);
 
   // With automatic sending on, confirming an order books it with Steadfast.
   if (update.deliveryStatus === "confirm") order = await autoSendIfEnabled(order, req.session.user._id);

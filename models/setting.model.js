@@ -5,6 +5,12 @@ const mongoose = require("mongoose");
  * and the thresholds the fraud checker uses. `getSettings()` creates it with
  * sensible defaults the first time it is asked for.
  */
+/** A whole number of days from the environment, or `fallback` when unset or invalid. */
+const envDays = (name, fallback) => {
+  const value = Number(process.env[name]);
+  return process.env[name] !== undefined && process.env[name] !== "" && Number.isInteger(value) && value >= 0 ? value : fallback;
+};
+
 const deliveryZoneSchema = new mongoose.Schema(
   {
     key: { type: String, required: true, trim: true },
@@ -32,6 +38,15 @@ const settingSchema = new mongoose.Schema(
       apiKey: { type: String, trim: true, default: "" },
       secretKey: { type: String, trim: true, default: "" },
       autoSend: { type: Boolean, default: false },
+    },
+    // Merchant subscriptions: how long a verified payment lasts, how long an
+    // expired account keeps working before it is suspended, and where to pay.
+    merchantBilling: {
+      periodDays: { type: Number, default: () => envDays("MERCHANT_PERIOD_DAYS", 30), min: 1, max: 365 },
+      graceDays: { type: Number, default: () => envDays("MERCHANT_GRACE_DAYS", 3), min: 0, max: 60 },
+      // Offered when approving a merchant; each merchant's fee can differ.
+      defaultFee: { type: Number, default: () => Math.max(Number(process.env.MERCHANT_MONTHLY_FEE) || 0, 0), min: 0 },
+      instructions: { type: String, trim: true, default: "", maxlength: 2000 },
     },
     fraud: {
       enabled: { type: Boolean, default: true },

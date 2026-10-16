@@ -3,6 +3,7 @@ const variantModel = require("../models/variant.model");
 const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const messages = require("../utils/messages");
+const { isPublicProduct } = require("../utils/merchant");
 
 exports.addVariantController = asyncHandler(async (req, res) => {
   const { size, color, sku, product } = req.body || {};
@@ -51,6 +52,8 @@ exports.updateVariantController = asyncHandler(async (req, res) => {
 });
 
 exports.productVariantsController = asyncHandler(async (req, res) => {
+  // A hidden product (pending, rejected, or its merchant suspended or locked) has no public variants.
+  if (!(await isPublicProduct(req.params.productId))) return apiResponse(res, 200, messages.productsFetched, []);
   const variants = await variantModel.find({ product: req.params.productId });
   apiResponse(res, 200, messages.productsFetched, variants);
 });
