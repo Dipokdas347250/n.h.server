@@ -61,13 +61,10 @@ const merchantApplicationSchema = new Schema(
     reviewedAt: { type: Date, default: null },
     merchant: { type: Schema.Types.ObjectId, ref: "Merchant", default: null },
 
-<<<<<<< HEAD
     // Referral code the applicant came with, and the merchant it belongs to.
     referralCode: { type: String, trim: true, default: "" },
     referredBy: { type: Schema.Types.ObjectId, ref: "Merchant", default: null },
 
-=======
->>>>>>> origin/main
     ipAddress: { type: String, default: "" },
   },
   { timestamps: true }

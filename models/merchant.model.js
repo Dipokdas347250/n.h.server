@@ -79,23 +79,17 @@ const merchantSchema = new Schema(
     lockedAt: { type: Date, default: null },
 
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
-<<<<<<< HEAD
 
     // This merchant's own code for referral links (utils/referral.js), and the
     // merchant whose code they registered with, if any.
     referralCode: { type: String, trim: true, uppercase: true },
     referredBy: { type: Schema.Types.ObjectId, ref: "Merchant", default: null, index: true },
-=======
->>>>>>> origin/main
   },
   { timestamps: true }
 );
 
-<<<<<<< HEAD
 merchantSchema.index({ referralCode: 1 }, { unique: true, partialFilterExpression: { referralCode: { $type: "string" } } });
 
-=======
->>>>>>> origin/main
 // A suspended merchant's account, payments and history are kept, never deleted.
 preventDeletion(merchantSchema, "Merchant");
 

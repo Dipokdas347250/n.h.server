@@ -294,7 +294,6 @@ const messages = {
     bn: "এন এইচ শপ এখনও এই অর্ডারটি যাচাই করছে। নিশ্চিত করার আগে অপেক্ষা করুন।",
   },
 
-<<<<<<< HEAD
   // ---- referrals and referral credit ----
   referralCodeInvalid: {
     en: "This referral code was not found. Check it, or leave the field empty.",
@@ -324,9 +323,6 @@ const messages = {
     en: "Enter the date you sent the money (not in the future, and within the last 90 days)",
     bn: "যে তারিখে টাকা পাঠিয়েছেন তা লিখুন (ভবিষ্যতের তারিখ নয়, এবং গত ৯০ দিনের মধ্যে)",
   },
-=======
-  // ---- merchant payment proofs ----
->>>>>>> origin/main
   billingFetched: { en: "Subscription details fetched", bn: "সাবস্ক্রিপশনের তথ্য আনা হয়েছে" },
   paymentProofInvalid: {
     en: "Choose the payment method and enter the amount you sent and the transaction ID",

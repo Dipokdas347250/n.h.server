@@ -19,11 +19,8 @@ const subscriptionSchema = new Schema(
     endsAt: { type: Date, required: true },
     fee: { type: Number, min: 0, default: 0 },
     amountPaid: { type: Number, min: 0, default: 0 },
-<<<<<<< HEAD
     // Referral credit that paid part (or all) of `fee`.
     creditApplied: { type: Number, min: 0, default: 0 },
-=======
->>>>>>> origin/main
     // How the period was granted.
     source: { type: String, enum: ["approval", "payment_proof", "manual_payment", "trial_extension", "migration"], required: true },
     paymentSubmission: { type: Schema.Types.ObjectId, ref: "PaymentSubmission", default: null },

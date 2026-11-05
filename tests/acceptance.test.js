@@ -74,15 +74,10 @@ const apply = (http, fields, nidFile = "nid-1234567890.png") => {
   );
 };
 
-<<<<<<< HEAD
 const today = () => new Date().toISOString().slice(0, 10);
 
 const proof = (http, transactionId, amount = "500", fields = {}) =>
   http("POST", "/merchant/payment-submissions", form({ method: "bkash", amount, transactionId, paidAt: today(), ...fields }, [["screenshot", PNG, "image/png", "s.png"]]));
-=======
-const proof = (http, transactionId, amount = "500") =>
-  http("POST", "/merchant/payment-submissions", form({ method: "bkash", amount, transactionId }, [["screenshot", PNG, "image/png", "s.png"]]));
->>>>>>> origin/main
 
 /** Moves a merchant's dates as if `days` had passed, then runs the scheduled job. */
 const timeTravel = async (merchantId, days) => {
@@ -151,11 +146,8 @@ before(async () => {
     Audit: require("../models/auditLog.model"),
     JobLock: require("../models/jobLock.model"),
     Setting: require("../models/setting.model"),
-<<<<<<< HEAD
     LandingPage: require("../models/landingPage.model"),
     LandingOrder: require("../models/landingOrder.model"),
-=======
->>>>>>> origin/main
   };
   jobs = require("../utils/merchant");
 
@@ -164,7 +156,6 @@ before(async () => {
   await login(admin, "admin@test.local");
 });
 
-<<<<<<< HEAD
 describe("Standalone landing page", () => {
   it("serves public content while keeping content management admin-only", async () => {
     const response = await guest("GET", "/landing-page");
@@ -283,8 +274,6 @@ describe("Standalone landing page", () => {
   });
 });
 
-=======
->>>>>>> origin/main
 after(async () => {
   const mongoose = require("mongoose");
   await mongoose.disconnect();
@@ -620,7 +609,6 @@ describe("14. Audit log and permanent records", () => {
     }
   });
 });
-<<<<<<< HEAD
 
 // ---------------------------------------------------------------- referrals
 
@@ -849,5 +837,3 @@ describe("15. Manual bKash/Nagad payments and referral credit", () => {
     }
   });
 });
-=======
->>>>>>> origin/main

@@ -25,10 +25,7 @@ const subscriptionModel = require("../models/subscription.model");
 const auditLogModel = require("../models/auditLog.model");
 const submissionModel = require("../models/paymentSubmission.model");
 const { buildMerchantSummary } = require("./merchant.controller");
-<<<<<<< HEAD
 const { ensureReferralCode, linkReferral, qualifyReferral } = require("../utils/referral");
-=======
->>>>>>> origin/main
 
 /*
  * The super-admin side of the merchant system. Mounted behind
@@ -171,12 +168,9 @@ exports.approveApplicationController = asyncHandler(async (req, res) => {
       await subscriptionModel.create({ merchant: merchant._id, kind: "trial", startsAt: trialStartsAt, endsAt: trialEndsAt, fee: 0, source: "approval", createdBy: req.session.user._id });
     }
     await audit({ req, action: "account.approved", merchant, subject: merchant, details: { trial: grantTrial, trialEndsAt, monthlyFee, duplicateNid: duplicates.length > 0 } });
-<<<<<<< HEAD
     // Neither may undo the approval: a missing code is assigned on first use.
     await ensureReferralCode(merchant).catch((codeError) => console.error("Referral code not assigned:", codeError.message));
     await linkReferral({ req, merchant, application: claimed });
-=======
->>>>>>> origin/main
     await notifyMerchant({
       merchant,
       type: grantTrial ? "trial_started" : "account_approved",
@@ -464,11 +458,8 @@ exports.recordPaymentController = asyncHandler(async (req, res) => {
     subject: merchant,
     details: { amount, months, method: merchant.payments.at(-1).method, reference: merchant.payments.at(-1).reference, periodStart, periodEnd },
   });
-<<<<<<< HEAD
   // A payment the administrator took and recorded counts as verified too.
   await qualifyReferral({ req, merchant, amountPaid: amount });
-=======
->>>>>>> origin/main
   apiResponse(res, 201, messages.merchantPaymentRecorded, merchant);
 });
 

@@ -38,11 +38,8 @@ const CATEGORY = {
   ticket_reply: "support",
   ticket_status: "support",
   merchant_application: "application",
-<<<<<<< HEAD
   referral_credit_earned: "referral",
   referral_credit_adjusted: "referral",
-=======
->>>>>>> origin/main
 };
 
 const TIME_ZONE = "Asia/Dhaka";
@@ -106,7 +103,6 @@ const MERCHANT_EMAILS = {
     en: [`Your payment was verified and your account is active until ${dateEn(p.paidUntil)}.`],
     bn: [`আপনার পেমেন্ট যাচাই হয়েছে এবং অ্যাকাউন্টটি ${dateBn(p.paidUntil)} পর্যন্ত সক্রিয়।`],
   }),
-<<<<<<< HEAD
   referral_credit_earned: (p) => ({
     subject: `${storeName}: you earned ${takaEn(p.amount)} referral credit`,
     en: [
@@ -118,8 +114,6 @@ const MERCHANT_EMAILS = {
       "এটি আপনার পরবর্তী সাবস্ক্রিপশন ফি থেকে স্বয়ংক্রিয়ভাবে কেটে নেওয়া হবে। রেফারেল ক্রেডিট নগদে তোলা যায় না।",
     ],
   }),
-=======
->>>>>>> origin/main
   ticket_reply: (p) => ({
     subject: `${storeName}: reply to your support request ${p.ticketNumber}`,
     en: [`N H Shop replied to your support request "${p.subject}" (${p.ticketNumber}). Sign in to your dashboard to read it.`],

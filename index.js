@@ -28,11 +28,7 @@ dbconfig();
 
 // The storefront and the dashboard both send the session cookie, so every
 // allowed origin has to be listed explicitly when credentials are in play.
-<<<<<<< HEAD
 const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000,http://localhost:3001")
-=======
-const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000")
->>>>>>> origin/main
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
