@@ -74,8 +74,10 @@ const apply = (http, fields, nidFile = "nid-1234567890.png") => {
   );
 };
 
-const proof = (http, transactionId, amount = "500") =>
-  http("POST", "/merchant/payment-submissions", form({ method: "bkash", amount, transactionId }, [["screenshot", PNG, "image/png", "s.png"]]));
+const today = () => new Date().toISOString().slice(0, 10);
+
+const proof = (http, transactionId, amount = "500", fields = {}) =>
+  http("POST", "/merchant/payment-submissions", form({ method: "bkash", amount, transactionId, paidAt: today(), ...fields }, [["screenshot", PNG, "image/png", "s.png"]]));
 
 /** Moves a merchant's dates as if `days` had passed, then runs the scheduled job. */
 const timeTravel = async (merchantId, days) => {
@@ -144,12 +146,132 @@ before(async () => {
     Audit: require("../models/auditLog.model"),
     JobLock: require("../models/jobLock.model"),
     Setting: require("../models/setting.model"),
+    LandingPage: require("../models/landingPage.model"),
+    LandingOrder: require("../models/landingOrder.model"),
   };
   jobs = require("../utils/merchant");
 
   const bcrypt = require("bcrypt");
   await models.User.create({ fullname: "Admin", email: "admin@test.local", password: await bcrypt.hash("password123", 10), role: "admin", verified: true });
   await login(admin, "admin@test.local");
+});
+
+describe("Standalone landing page", () => {
+  it("serves public content while keeping content management admin-only", async () => {
+    const response = await guest("GET", "/landing-page");
+    assert.equal(response.status, 200);
+    assert.equal(response.data.products.length, 3);
+    assert.equal((await guest("PATCH", "/landing-page", { bannerTitle: "Not allowed" })).status, 401);
+
+    const products = [
+      { name: "Sleep Balm", title: "Pocket", weight: "25 g", price: 777 },
+      { name: "Sleep Balm", title: "Everyday", weight: "40 g", price: 888 },
+      { name: "Sleep Balm", title: "Full", weight: "75 g", price: 999 },
+    ];
+    const updated = await admin("PATCH", "/landing-page", {
+      bannerTitle: "A managed banner",
+      bannerText: "Managed landing page copy",
+      products,
+      deliveryZones: [
+        { key: "inside_dhaka", label: "Inside Dhaka", labelBn: "ঢাকার ভেতরে", charge: 75 },
+        { key: "dhaka_suburb", label: "Dhaka suburb", labelBn: "ঢাকার আশপাশ", charge: 95 },
+        { key: "outside_dhaka", label: "Outside Dhaka", labelBn: "ঢাকার বাইরে", charge: 140 },
+      ],
+    });
+    assert.equal(updated.status, 200, updated.message);
+    assert.equal(updated.data.bannerTitle, "A managed banner");
+    assert.equal(updated.data.products[0].price, 777);
+    assert.equal(updated.data.products[0].weight, "25 g");
+    assert.equal(updated.data.products[0].village, undefined);
+    assert.equal(updated.data.deliveryZones[0].charge, 75);
+  });
+
+  it("uploads banner and product images and keeps internal asset ids private", async () => {
+    const products = [
+      { name: "Sleep Balm", title: "Pocket", weight: "25 g", price: 777 },
+      { name: "Sleep Balm", title: "Everyday", weight: "40 g", price: 888 },
+      { name: "Sleep Balm", title: "Full", weight: "75 g", price: 999 },
+    ];
+    const updated = await admin("PATCH", "/landing-page", form(
+      { bannerTitle: "Uploaded banner", bannerText: "Image test", products: JSON.stringify(products) },
+      [["bannerImage", PNG, "image/png", "banner.png"], ["productImage0", PNG, "image/png", "product.png"]]
+    ));
+    assert.equal(updated.status, 200, updated.message);
+    assert.match(updated.data.bannerImage, /^https:\/\/example\.test\//);
+    assert.equal(updated.data.bannerImageId, undefined);
+    assert.match(updated.data.products[0].image, /^https:\/\/example\.test\//);
+    assert.equal(updated.data.products[0].imageId, undefined);
+    const publicPage = await guest("GET", "/landing-page");
+    assert.equal(publicPage.data.bannerImage, updated.data.bannerImage);
+    assert.equal(publicPage.data.bannerImageId, undefined);
+    assert.equal(publicPage.data.products[0].image, updated.data.products[0].image);
+    assert.equal(publicPage.data.products[0].imageId, undefined);
+
+    const gallery = await admin("PATCH", "/landing-page", form({}, [
+      ["bannerImages", PNG, "image/png", "banner-one.png"],
+      ["bannerImages", PNG, "image/png", "banner-two.png"],
+    ]));
+    assert.equal(gallery.status, 200, gallery.message);
+    assert.equal(gallery.data.bannerImages.length, 2);
+    assert.equal(gallery.data.bannerImage, gallery.data.bannerImages[0].url);
+    assert.equal(gallery.data.bannerImages[0].imageId, undefined);
+    const publicGallery = await guest("GET", "/landing-page");
+    assert.equal(publicGallery.data.bannerImages.length, 2);
+    assert.equal(publicGallery.data.bannerImages[1].imageId, undefined);
+
+    const cleared = await admin("PATCH", "/landing-page", form({ removeBannerImages: "true" }));
+    assert.equal(cleared.status, 200, cleared.message);
+    assert.deepEqual(cleared.data.bannerImages, []);
+    assert.equal(cleared.data.bannerImage, "");
+  });
+
+  it("records customer details using server-side product and delivery prices", async () => {
+    const placed = await guest("POST", "/landing-page/orders", {
+      productCode: "15g",
+      quantity: 2,
+      deliveryZone: "inside_dhaka",
+      customer: {
+        name: "Landing Customer",
+        phone: "01712345678",
+        address: "House 10 Road 2 Dhanmondi",
+        city: "Dhaka",
+      },
+    });
+    assert.equal(placed.status, 201, placed.message);
+    assert.match(placed.data.orderNumber, /^LP-/);
+    assert.equal(placed.data.product.unitPrice, 777);
+    assert.equal(placed.data.product.weight, "25 g");
+    assert.equal(placed.data.product.image, (await models.LandingPage.findOne({ singleton: "store" })).products[0].image);
+    assert.equal(placed.data.subtotal, 1554);
+    assert.equal(placed.data.deliveryCharge, 75);
+    assert.equal(placed.data.total, 1629);
+    assert.equal(placed.data.customer.phone, "01712345678");
+    assert.equal((await models.LandingOrder.findById(placed.data._id)).status, "pending");
+    assert.equal((await guest("GET", "/landing-page/orders")).status, 401);
+
+    const inbox = await admin("GET", "/landing-page/orders");
+    assert.equal(inbox.status, 200);
+    assert.ok(inbox.data.some((order) => order._id === placed.data._id));
+    const updated = await admin("PATCH", `/landing-page/orders/${placed.data._id}`, { status: "confirmed" });
+    assert.equal(updated.status, 200, updated.message);
+    assert.equal(updated.data.status, "confirmed");
+    assert.equal((await admin("PATCH", `/landing-page/orders/${placed.data._id}`, { status: "invalid" })).status, 400);
+  });
+
+  it("rejects orders with invalid delivery areas", async () => {
+    const invalidZone = await guest("POST", "/landing-page/orders", {
+      productCode: "15g",
+      quantity: 1,
+      deliveryZone: "free_delivery",
+      customer: {
+        name: "Landing Customer",
+        phone: "01712345678",
+        address: "House 10 Road 2 Dhanmondi",
+        city: "Dhaka",
+      },
+    });
+    assert.equal(invalidZone.status, 400);
+  });
 });
 
 after(async () => {
@@ -483,6 +605,234 @@ describe("14. Audit log and permanent records", () => {
     await assert.rejects(models.Audit.updateMany({}, { action: "x" }));
     await assert.rejects(models.Audit.deleteMany({}));
     for (const model of [models.Merchant, models.Order, models.Submission, models.Ticket, models.Subscription]) {
+      await assert.rejects(model.deleteMany({}), `${model.modelName} must not be deletable`);
+    }
+  });
+});
+
+// ---------------------------------------------------------------- referrals
+
+/** Applies with a blank NID photo: unreadable, so accepted and flagged for the administrator. */
+const applyWithoutPhoto = (http, fields) =>
+  http(
+    "POST",
+    "/merchant/apply",
+    form(
+      { fullname: "Referral Seller", businessName: "Referral Shop", address: "House 9, Road 9, Mirpur, Dhaka", productType: "Shoes", password: "password123", ...fields },
+      [["nidFront", PNG, "image/png", "front.png"], ["nidBack", PNG, "image/png", "back.png"]]
+    )
+  );
+
+const approveApplication = async (applicationId, body = { monthlyFee: 500 }) => {
+  const approved = await admin("POST", `/admin/merchant-applications/${applicationId}/approve`, body);
+  assert.equal(approved.status, 201, approved.message);
+  return approved.data;
+};
+
+/** Approves and activates a proof as the administrator would. */
+const verify = async (submissionId) => {
+  assert.equal((await admin("POST", `/admin/payment-submissions/${submissionId}/approve`)).status, 200);
+  const activated = await admin("POST", `/admin/payment-submissions/${submissionId}/activate`);
+  assert.equal(activated.status, 200, activated.message);
+  return activated.data;
+};
+
+const creditOf = async (merchantId) => (await models.CreditAccount.findOne({ merchant: merchantId }).lean()) || {};
+
+describe("15. Manual bKash/Nagad payments and referral credit", () => {
+  const rina = client();
+  const sam = client();
+  let rinaMerchant;
+  let samMerchant;
+  let rinaCode;
+
+  before(() => {
+    models.Referral = require("../models/referral.model");
+    models.CreditAccount = require("../models/referralCreditAccount.model");
+    models.CreditLedger = require("../models/referralCreditTransaction.model");
+  });
+
+  it("lets the administrator set the bKash and Nagad numbers and the referral credit", async () => {
+    const invalid = await admin("PATCH", "/admin/settings", { merchantBilling: { accounts: { bkash: { number: "12345" } } } });
+    assert.equal(invalid.status, 400);
+    const saved = await admin("PATCH", "/admin/settings", {
+      merchantBilling: { accounts: { bkash: { number: "+8801712345678", type: "personal" }, nagad: { number: "" } } },
+      merchantReferral: { creditAmount: 100 },
+    });
+    assert.equal(saved.status, 200, saved.message);
+    assert.equal(saved.data.merchantBilling.accounts.bkash.number, "01712345678");
+    assert.equal(saved.data.merchantReferral.creditAmount, 100);
+  });
+
+  it("gives every merchant a referral code, and refuses an unknown code on an application", async () => {
+    const applied = await applyWithoutPhoto(guest, { email: "rina@test.local", phone: "01912345671", nidNumber: "5550000001" });
+    assert.equal(applied.status, 201, applied.message);
+    rinaMerchant = (await approveApplication(applied.data._id))._id;
+    await login(rina, "rina@test.local");
+    const mine = await rina("GET", "/merchant/referrals");
+    assert.equal(mine.status, 200);
+    rinaCode = mine.data.referralCode;
+    assert.match(rinaCode, /^NH[A-Z2-9]{6}$/);
+    assert.equal(mine.data.creditPerReferral, 100);
+    assert.deepEqual([mine.data.credit.available, mine.data.credit.earned], [0, 0]);
+
+    const unknown = await applyWithoutPhoto(guest, { email: "nobody@test.local", phone: "01912345679", nidNumber: "5550000009", referralCode: "NHZZZZZZ" });
+    assert.equal(unknown.status, 400);
+  });
+
+  it("shows only the configured wallet, the payment number and the invoice on the billing page", async () => {
+    const billing = await rina("GET", "/merchant/billing");
+    assert.deepEqual(billing.data.methods, ["bkash"]);
+    assert.equal(billing.data.paymentAccounts[0].number, "01712345678");
+    assert.deepEqual(billing.data.invoice, { fee: 500, creditApplied: 0, payable: 500, creditLeft: 0 });
+    // Nagad has no number, so it cannot be used; a payment date is required.
+    assert.equal((await proof(rina, "TRX-RINA-NAGAD", "500", { method: "nagad" })).status, 400);
+    assert.equal((await proof(rina, "TRX-RINA-NODATE", "500", { paidAt: "" })).status, 400);
+    assert.equal((await proof(rina, "TRX-RINA-FUTURE", "500", { paidAt: "2999-01-01" })).status, 400);
+    await admin("PATCH", "/admin/settings", { merchantBilling: { accounts: { nagad: { number: "01812345678" } } } });
+    assert.deepEqual((await rina("GET", "/merchant/billing")).data.methods, ["bkash", "nagad"]);
+  });
+
+  it("links a merchant who registers with a referral link to the referrer", async () => {
+    const applied = await applyWithoutPhoto(guest, { email: "sam@test.local", phone: "01912345672", nidNumber: "5550000002", referralCode: rinaCode.toLowerCase() });
+    assert.equal(applied.status, 201, applied.message);
+    samMerchant = (await approveApplication(applied.data._id))._id;
+    await login(sam, "sam@test.local");
+    const sammy = await models.Merchant.findById(samMerchant).lean();
+    assert.equal(String(sammy.referredBy), String(rinaMerchant));
+    const referral = await models.Referral.findOne({ referred: samMerchant }).lean();
+    assert.equal(referral.status, "pending");
+    assert.ok(await models.Audit.exists({ action: "referral.linked", subjectId: referral._id }));
+  });
+
+  it("does not count a referrer referring themselves", async () => {
+    // Same mobile number as Rina, with an email so the number is allowed.
+    const applied = await applyWithoutPhoto(guest, { email: "rina2@test.local", phone: "01912345671", nidNumber: "5550000003", referralCode: rinaCode });
+    assert.equal(applied.status, 201, applied.message);
+    const second = await approveApplication(applied.data._id);
+    const referral = await models.Referral.findOne({ referred: second._id }).lean();
+    assert.equal(referral.status, "void");
+    assert.equal(referral.voidReason, "same_person");
+  });
+
+  it("earns nothing until the referred merchant's first payment is verified, then 100 Tk once", async () => {
+    const submitted = await proof(sam, "TRX-SAM-1", "500");
+    assert.equal(submitted.status, 201, submitted.message);
+    assert.equal(submitted.data.status, "pending");
+    assert.ok(submitted.data.paidAt);
+    assert.equal(submitted.data.payTo, "01712345678");
+    assert.equal((await creditOf(rinaMerchant)).earned || 0, 0, "submitting is not verification");
+
+    assert.equal((await admin("POST", `/admin/payment-submissions/${submitted.data._id}/approve`)).status, 200);
+    assert.equal((await creditOf(rinaMerchant)).earned || 0, 0, "approval alone starts nothing");
+    assert.equal((await admin("POST", `/admin/payment-submissions/${submitted.data._id}/activate`)).status, 200);
+
+    const account = await creditOf(rinaMerchant);
+    assert.deepEqual([account.available, account.earned], [100, 100]);
+    assert.equal((await models.Referral.findOne({ referred: samMerchant }).lean()).status, "credited");
+    assert.ok(await models.Notification.exists({ merchant: rinaMerchant, type: "referral_credit_earned" }));
+    // Paid; still "trial" until the free trial ends, as before.
+    assert.ok((await models.Merchant.findById(samMerchant).lean()).paidUntil > new Date());
+
+    // Activating again, a second payment by Sam, and racing grants: still 100.
+    assert.equal((await admin("POST", `/admin/payment-submissions/${submitted.data._id}/activate`)).status, 409);
+    const second = await proof(sam, "TRX-SAM-2", "500");
+    await verify(second.data._id);
+    const { qualifyReferral } = require("../utils/referral");
+    const sammy = await models.Merchant.findById(samMerchant);
+    await Promise.all([qualifyReferral({ merchant: sammy, amountPaid: 500 }), qualifyReferral({ merchant: sammy, amountPaid: 500 })]);
+    assert.equal((await creditOf(rinaMerchant)).earned, 100);
+    assert.equal(await models.CreditLedger.countDocuments({ merchant: rinaMerchant, type: "earned" }), 1);
+  });
+
+  it("takes the credit off the next invoice: 500 fee − 100 credit = 400 to pay", async () => {
+    const billing = await rina("GET", "/merchant/billing");
+    assert.deepEqual(billing.data.invoice, { fee: 500, creditApplied: 100, payable: 400, creditLeft: 0 });
+
+    const submitted = await proof(rina, "TRX-RINA-1", "400");
+    assert.equal(submitted.status, 201, submitted.message);
+    assert.deepEqual([submitted.data.fee, submitted.data.creditApplied, submitted.data.expectedAmount], [500, 100, 400]);
+    let account = await creditOf(rinaMerchant);
+    assert.deepEqual([account.available, account.reserved], [0, 100], "reserved while waiting");
+
+    // Rejected: the merchant is told why and the credit comes back.
+    await admin("POST", `/admin/payment-submissions/${submitted.data._id}/reject`, { reason: "Transaction not found" });
+    account = await creditOf(rinaMerchant);
+    assert.deepEqual([account.available, account.reserved], [100, 0]);
+    const mine = await rina("GET", "/merchant/billing");
+    assert.equal(mine.data.submissions[0].rejectionReason, "Transaction not found");
+
+    // Submitted again and verified: the credit is spent.
+    const again = await proof(rina, "TRX-RINA-1", "400");
+    assert.equal(again.status, 201, "a rejected transaction ID can be submitted again");
+    await verify(again.data._id);
+    account = await creditOf(rinaMerchant);
+    assert.deepEqual([account.available, account.reserved, account.used], [0, 0, 100]);
+    const period = await models.Subscription.findOne({ paymentSubmission: again.data._id }).lean();
+    assert.deepEqual([period.fee, period.amountPaid, period.creditApplied], [500, 400, 100]);
+    const types = (await models.CreditLedger.find({ merchant: rinaMerchant }).sort({ createdAt: 1 }).lean()).map((entry) => entry.type);
+    assert.deepEqual(types, ["earned", "reserved", "released", "reserved", "used"]);
+  });
+
+  it("pays a whole fee from credit and keeps the rest for the next month", async () => {
+    assert.equal((await admin("POST", `/admin/merchants/${rinaMerchant}/referral-credit/adjust`, { amount: 600, reason: "Five referrals before launch" })).status, 200);
+    const billing = await rina("GET", "/merchant/billing");
+    assert.deepEqual(billing.data.invoice, { fee: 500, creditApplied: 500, payable: 0, creditLeft: 100 });
+
+    const submitted = await rina("POST", "/merchant/payment-submissions", form({ method: "credit" }));
+    assert.equal(submitted.status, 201, submitted.message);
+    assert.deepEqual([submitted.data.amount, submitted.data.creditApplied, submitted.data.expectedAmount], [0, 500, 0]);
+    await verify(submitted.data._id);
+    const account = await creditOf(rinaMerchant);
+    assert.deepEqual([account.available, account.reserved, account.used], [100, 0, 600]);
+
+    // 100 left cannot pay a 500 fee on its own, and nothing is held by trying.
+    assert.equal((await rina("POST", "/merchant/payment-submissions", form({ method: "credit" }))).status, 400);
+    assert.deepEqual([(await creditOf(rinaMerchant)).available, (await creditOf(rinaMerchant)).reserved], [100, 0]);
+  });
+
+  it("counts a payment the administrator records by hand as verified", async () => {
+    const applied = await applyWithoutPhoto(guest, { email: "tom@test.local", phone: "01912345673", nidNumber: "5550000004", referralCode: rinaCode });
+    const tom = await approveApplication(applied.data._id);
+    assert.equal((await admin("POST", `/admin/merchants/${tom._id}/payments`, { amount: 500, months: 1, method: "bkash", reference: "CASH-TOM" })).status, 201);
+    assert.equal((await creditOf(rinaMerchant)).earned, 200);
+  });
+
+  it("lets only administrators see and correct credit, never below zero", async () => {
+    assert.equal((await admin("POST", `/admin/merchants/${rinaMerchant}/referral-credit/adjust`, { amount: -10000, reason: "Too much" })).status, 409);
+    assert.equal((await admin("POST", `/admin/merchants/${rinaMerchant}/referral-credit/adjust`, { amount: 50 })).status, 400, "a reason is required");
+    for (const [method, url] of [["GET", "/admin/referrals"], ["GET", `/admin/merchants/${rinaMerchant}/referral-credit`], ["POST", `/admin/merchants/${rinaMerchant}/referral-credit/adjust`]]) {
+      assert.equal((await rina(method, url, method === "POST" ? { amount: 1000, reason: "please" } : undefined)).status, 403, url);
+    }
+    // Sam sees his own (empty) credit, not Rina's.
+    const samView = await sam("GET", "/merchant/referrals");
+    assert.equal(samView.data.ledger.length, 0);
+    assert.equal(samView.data.credit.earned, 0);
+
+    const overview = await admin("GET", "/admin/referrals");
+    assert.equal(overview.status, 200);
+    assert.equal(overview.data.counts.credited, 2);
+    assert.equal(overview.data.counts.void, 1);
+    const { earned, used, adjusted, available, reserved, unused } = overview.data.totals;
+    assert.deepEqual([earned, used, adjusted], [200, 600, 600]);
+    assert.equal(unused, earned + adjusted - used);
+    assert.equal(unused, available + reserved);
+
+    const detail = await admin("GET", `/admin/merchants/${rinaMerchant}/referral-credit`);
+    assert.equal(detail.data.referrals.length, 3);
+    assert.equal(detail.data.ledger.find((entry) => entry.type === "adjusted").note, "Five referrals before launch");
+    assert.ok(await models.Audit.exists({ action: "credit.adjusted", merchant: rinaMerchant }));
+  });
+
+  it("keeps credit, referrals and credit history through a lock, and never deletes or rewrites them", async () => {
+    await admin("POST", `/admin/merchants/${rinaMerchant}/lock`, { reason: "Test" });
+    assert.equal((await rina("GET", "/merchant/billing")).status, 403);
+    assert.equal((await creditOf(rinaMerchant)).available, 200);
+    await admin("POST", `/admin/merchants/${rinaMerchant}/unlock`);
+    assert.equal((await rina("GET", "/merchant/referrals")).data.credit.available, 200);
+
+    await assert.rejects(models.CreditLedger.updateMany({}, { amount: 1 }));
+    for (const model of [models.CreditLedger, models.CreditAccount, models.Referral]) {
       await assert.rejects(model.deleteMany({}), `${model.modelName} must not be deletable`);
     }
   });

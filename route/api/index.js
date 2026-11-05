@@ -14,6 +14,7 @@ const admin = require('./admin')
 const video = require('./video')
 const settings = require('./settings')
 const merchant = require('./merchant')
+const landingPage = require('./landing-page')
 
 
 
@@ -33,5 +34,6 @@ router.use("/admin", admin)
 router.use("/video", video)
 router.use("/settings", settings)
 router.use("/merchant", merchant)
+router.use("/landing-page", landingPage)
 
 module.exports = router;

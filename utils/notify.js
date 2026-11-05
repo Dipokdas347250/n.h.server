@@ -38,6 +38,8 @@ const CATEGORY = {
   ticket_reply: "support",
   ticket_status: "support",
   merchant_application: "application",
+  referral_credit_earned: "referral",
+  referral_credit_adjusted: "referral",
 };
 
 const TIME_ZONE = "Asia/Dhaka";
@@ -100,6 +102,17 @@ const MERCHANT_EMAILS = {
     subject: `${storeName}: your merchant account is active`,
     en: [`Your payment was verified and your account is active until ${dateEn(p.paidUntil)}.`],
     bn: [`আপনার পেমেন্ট যাচাই হয়েছে এবং অ্যাকাউন্টটি ${dateBn(p.paidUntil)} পর্যন্ত সক্রিয়।`],
+  }),
+  referral_credit_earned: (p) => ({
+    subject: `${storeName}: you earned ${takaEn(p.amount)} referral credit`,
+    en: [
+      `${p.merchantName}, who joined with your referral link, has paid their first subscription. You earned ${takaEn(p.amount)} referral credit.`,
+      "It is taken off your next subscription fee automatically. Referral credit cannot be withdrawn as cash.",
+    ],
+    bn: [
+      `আপনার রেফারেল লিংকে যোগ দেওয়া ${p.merchantName} প্রথম সাবস্ক্রিপশন পরিশোধ করেছেন। আপনি ${takaBn(p.amount)} রেফারেল ক্রেডিট পেয়েছেন।`,
+      "এটি আপনার পরবর্তী সাবস্ক্রিপশন ফি থেকে স্বয়ংক্রিয়ভাবে কেটে নেওয়া হবে। রেফারেল ক্রেডিট নগদে তোলা যায় না।",
+    ],
   }),
   ticket_reply: (p) => ({
     subject: `${storeName}: reply to your support request ${p.ticketNumber}`,

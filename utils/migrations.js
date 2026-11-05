@@ -6,6 +6,7 @@ const { protectNid } = require("./nidCrypto");
 const { normalizeNid } = require("./merchant");
 const notificationModel = require("../models/notification.model");
 const { CATEGORY } = require("./notify");
+const { ensureReferralCode } = require("./referral");
 
 /*
  * Data changes the merchant system needs on databases created before it.
@@ -86,6 +87,13 @@ const backfillNotificationCategories = async () => {
   }
 };
 
+/** Referral codes for merchants approved before referrals existed. */
+const backfillReferralCodes = async () => {
+  const merchants = await merchantModel.find({ $or: [{ referralCode: { $exists: false } }, { referralCode: null }, { referralCode: "" }] }).select("_id referralCode");
+  for (const merchant of merchants) await ensureReferralCode(merchant);
+  if (merchants.length) console.log(`Migration: referral codes assigned to ${merchants.length} merchants`);
+};
+
 const runMigrations = async () => {
   const steps = [
     ["user email index", relaxUserEmailIndex],
@@ -93,6 +101,7 @@ const runMigrations = async () => {
     ["merchant NIDs", () => encryptStoredNids(merchantModel, "merchant")],
     ["subscription history", backfillSubscriptions],
     ["notification categories", backfillNotificationCategories],
+    ["referral codes", backfillReferralCodes],
   ];
   for (const [name, step] of steps) {
     try {

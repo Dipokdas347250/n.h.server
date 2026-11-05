@@ -14,6 +14,7 @@ const { Schema } = mongoose;
  *   subscription.expired   subscription.updated
  *   ticket.created      ticket.status_changed
  *   nid.viewed          (an administrator revealed a full NID number)
+ *   referral.linked     referral.voided    referral.credited  credit.adjusted
  */
 const auditLogSchema = new Schema(
   {

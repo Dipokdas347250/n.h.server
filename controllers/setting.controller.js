@@ -3,6 +3,7 @@ const { apiResponse } = require("../utils/apiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const { publicDeliveryConfig } = require("../utils/delivery");
 const messages = require("../utils/messages");
+const { normalizePhone, isValidBdPhone } = require("../utils/fraudCheck");
 
 /** Enough to show a key is saved without handing it out. */
 const maskKey = (value) => (value ? `••••${String(value).slice(-4)}` : "");
@@ -37,7 +38,7 @@ exports.adminSettingsController = asyncHandler(async (req, res) => {
 
 exports.updateSettingsController = asyncHandler(async (req, res) => {
   const settings = await Setting.getSettings();
-  const { deliveryZones, freeDeliveryThreshold, codMaxAmount, currency, fraud, metaPixelId, steadfast, merchantBilling } = req.body || {};
+  const { deliveryZones, freeDeliveryThreshold, codMaxAmount, currency, fraud, metaPixelId, steadfast, merchantBilling, merchantReferral } = req.body || {};
 
   if (Array.isArray(deliveryZones)) {
     const cleaned = deliveryZones
@@ -90,6 +91,28 @@ exports.updateSettingsController = asyncHandler(async (req, res) => {
       settings.merchantBilling.defaultFee = defaultFee;
     }
     if (typeof merchantBilling.instructions === "string") settings.merchantBilling.instructions = merchantBilling.instructions.trim().slice(0, 2000);
+
+    // The bKash / Nagad numbers merchants pay to. Blank removes one.
+    const accounts = merchantBilling.accounts;
+    if (accounts && typeof accounts === "object") {
+      for (const method of ["bkash", "nagad"]) {
+        const wallet = accounts[method];
+        if (!wallet || typeof wallet !== "object") continue;
+        if (wallet.number !== undefined) {
+          const number = String(wallet.number || "").trim() ? normalizePhone(wallet.number) : "";
+          if (number && !isValidBdPhone(number)) return apiResponse(res, 400, messages.paymentAccountInvalid);
+          settings.merchantBilling.accounts[method].number = number;
+        }
+        if (["personal", "agent", "merchant"].includes(wallet.type)) settings.merchantBilling.accounts[method].type = wallet.type;
+      }
+    }
+  }
+
+  if (merchantReferral && typeof merchantReferral === "object" && merchantReferral.creditAmount !== undefined && merchantReferral.creditAmount !== "") {
+    const creditAmount = Number(merchantReferral.creditAmount);
+    if (Number.isFinite(creditAmount) && creditAmount >= 0 && creditAmount <= 100000) {
+      settings.merchantReferral.creditAmount = Math.round(creditAmount * 100) / 100;
+    }
   }
 
   if (fraud && typeof fraud === "object") {

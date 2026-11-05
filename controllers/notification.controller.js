@@ -79,7 +79,7 @@ exports.notificationCenterController = asyncHandler(async (req, res) => {
   });
 });
 
-const AUDIT_GROUPS = ["payment", "account", "subscription", "ticket", "nid"];
+const AUDIT_GROUPS = ["payment", "account", "subscription", "ticket", "nid", "referral", "credit"];
 const PAGE_SIZE = 50;
 
 /** The audit log, newest first. Filters: `merchant`, `group` (payment, account, subscription, ticket), `page`. */

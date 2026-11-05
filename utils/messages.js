@@ -294,7 +294,35 @@ const messages = {
     bn: "এন এইচ শপ এখনও এই অর্ডারটি যাচাই করছে। নিশ্চিত করার আগে অপেক্ষা করুন।",
   },
 
+  // ---- referrals and referral credit ----
+  referralCodeInvalid: {
+    en: "This referral code was not found. Check it, or leave the field empty.",
+    bn: "এই রেফারেল কোডটি পাওয়া যায়নি। কোডটি যাচাই করুন, অথবা ঘরটি খালি রাখুন।",
+  },
+  referralsFetched: { en: "Referral details fetched", bn: "রেফারেলের তথ্য আনা হয়েছে" },
+  creditNotEnough: {
+    en: "Your referral credit does not cover the whole fee. Pay the rest by bKash or Nagad.",
+    bn: "আপনার রেফারেল ক্রেডিট দিয়ে পুরো ফি পরিশোধ হয় না। বাকি টাকা বিকাশ বা নগদে পরিশোধ করুন।",
+  },
+  creditAdjustmentInvalid: {
+    en: "Enter a non-zero amount (up to 100,000) and a reason",
+    bn: "শূন্য ছাড়া একটি পরিমাণ (সর্বোচ্চ ১,০০,০০০) এবং কারণ লিখুন",
+  },
+  creditNotEnoughToRemove: {
+    en: "The merchant does not have that much available credit to remove",
+    bn: "মার্চেন্টের কাছে কমানোর মতো এত উপলব্ধ ক্রেডিট নেই",
+  },
+  creditAdjusted: { en: "Referral credit adjusted", bn: "রেফারেল ক্রেডিট সমন্বয় করা হয়েছে" },
+  paymentAccountInvalid: {
+    en: "Enter a valid Bangladeshi mobile number (01XXXXXXXXX) for bKash and Nagad, or leave it empty",
+    bn: "বিকাশ ও নগদের জন্য সঠিক বাংলাদেশি মোবাইল নম্বর (01XXXXXXXXX) দিন, অথবা খালি রাখুন",
+  },
+
   // ---- merchant payment proofs ----
+  paymentDateInvalid: {
+    en: "Enter the date you sent the money (not in the future, and within the last 90 days)",
+    bn: "যে তারিখে টাকা পাঠিয়েছেন তা লিখুন (ভবিষ্যতের তারিখ নয়, এবং গত ৯০ দিনের মধ্যে)",
+  },
   billingFetched: { en: "Subscription details fetched", bn: "সাবস্ক্রিপশনের তথ্য আনা হয়েছে" },
   paymentProofInvalid: {
     en: "Choose the payment method and enter the amount you sent and the transaction ID",
