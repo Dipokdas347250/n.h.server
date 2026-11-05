@@ -81,6 +81,7 @@ const expiresAt = (merchant) => {
   return ends.length ? new Date(Math.max(...ends)) : null;
 };
 
+<<<<<<< HEAD
 const WALLET_METHODS = ["bkash", "nagad"];
 
 /**
@@ -97,13 +98,22 @@ const billingConfig = async () => {
     number: billing.accounts?.[method]?.number || "",
     type: billing.accounts?.[method]?.type || "personal",
   })).filter((account) => account.number);
+=======
+/** Subscription length, grace period, default fee and payment instructions from Store settings. */
+const billingConfig = async () => {
+  const settings = await Setting.getSettings();
+  const billing = settings.merchantBilling || {};
+>>>>>>> origin/main
   return {
     periodDays: Number.isInteger(billing.periodDays) && billing.periodDays > 0 ? billing.periodDays : 30,
     graceDays: Number.isInteger(billing.graceDays) && billing.graceDays >= 0 ? billing.graceDays : 3,
     defaultFee: Number.isFinite(billing.defaultFee) && billing.defaultFee >= 0 ? billing.defaultFee : DEFAULT_MONTHLY_FEE,
     instructions: billing.instructions || "",
+<<<<<<< HEAD
     accounts,
     methods: accounts.length ? accounts.map((account) => account.method) : WALLET_METHODS,
+=======
+>>>>>>> origin/main
   };
 };
 

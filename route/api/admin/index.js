@@ -44,11 +44,14 @@ const {
   activateFromPaymentController,
 } = require("../../../controllers/merchantBilling.controller");
 const {
+<<<<<<< HEAD
   adminReferralsController,
   adminMerchantCreditController,
   adjustCreditController,
 } = require("../../../controllers/referral.controller");
 const {
+=======
+>>>>>>> origin/main
   allTicketsController,
   adminTicketController,
   adminReplyController,
@@ -111,11 +114,14 @@ router.post("/payment-submissions/:id/approve", approvePaymentController);
 router.post("/payment-submissions/:id/reject", rejectPaymentController);
 router.post("/payment-submissions/:id/activate", activateFromPaymentController);
 
+<<<<<<< HEAD
 // Merchant referrals and referral credit accounts.
 router.get("/referrals", adminReferralsController);
 router.get("/merchants/:id/referral-credit", adminMerchantCreditController);
 router.post("/merchants/:id/referral-credit/adjust", adjustCreditController);
 
+=======
+>>>>>>> origin/main
 // Merchant Help & Support.
 router.get("/support-tickets", allTicketsController);
 router.get("/support-tickets/:id", adminTicketController);

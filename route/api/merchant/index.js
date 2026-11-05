@@ -13,7 +13,10 @@ const {
   updateMyOrderController,
 } = require("../../../controllers/merchant.controller");
 const { myBillingController, submitPaymentController } = require("../../../controllers/merchantBilling.controller");
+<<<<<<< HEAD
 const { myReferralsController } = require("../../../controllers/referral.controller");
+=======
+>>>>>>> origin/main
 const {
   myTicketsController,
   createTicketController,
@@ -55,8 +58,11 @@ router.post(
   acceptPrivateUploads([{ name: "screenshot", maxCount: 1, kind: "image" }]),
   submitPaymentController
 );
+<<<<<<< HEAD
 // Referral code, link and credit: credit is kept (and usable) even while suspended.
 router.get("/referrals", myReferralsController);
+=======
+>>>>>>> origin/main
 const ticketUploads = acceptPrivateUploads([
   { name: "images", maxCount: 3, kind: "image" },
   { name: "audio", maxCount: 1, kind: "audio" },

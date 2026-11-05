@@ -23,12 +23,15 @@ const deliveryZoneSchema = new mongoose.Schema(
   { _id: false }
 );
 
+<<<<<<< HEAD
 const walletSchema = {
   number: { type: String, trim: true, default: "" },
   // Personal, agent or merchant wallet: decides whether merchants "Send Money" or "Payment".
   type: { type: String, enum: ["personal", "agent", "merchant"], default: "personal" },
 };
 
+=======
+>>>>>>> origin/main
 const settingSchema = new mongoose.Schema(
   {
     singleton: { type: String, default: "store", unique: true },
@@ -53,6 +56,7 @@ const settingSchema = new mongoose.Schema(
       // Offered when approving a merchant; each merchant's fee can differ.
       defaultFee: { type: Number, default: () => Math.max(Number(process.env.MERCHANT_MONTHLY_FEE) || 0, 0), min: 0 },
       instructions: { type: String, trim: true, default: "", maxlength: 2000 },
+<<<<<<< HEAD
       // The wallet numbers merchants send their fee to. A method with no
       // number is not offered (unless neither has one; see `paymentAccounts`).
       accounts: {
@@ -64,6 +68,8 @@ const settingSchema = new mongoose.Schema(
     // first cash payment is verified. Only pays future subscription fees.
     merchantReferral: {
       creditAmount: { type: Number, default: () => Math.max(Number(process.env.MERCHANT_REFERRAL_CREDIT) || 100, 0), min: 0, max: 100000 },
+=======
+>>>>>>> origin/main
     },
     fraud: {
       enabled: { type: Boolean, default: true },

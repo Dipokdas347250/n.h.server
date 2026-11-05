@@ -13,7 +13,10 @@ const { normalizeNid, isValidNid, normalizeFacebookPage } = require("../utils/me
 const { notifyAdmins } = require("../utils/notify");
 const { checkNidPhoto } = require("../utils/nidOcr");
 const { hashNid, protectNid } = require("../utils/nidCrypto");
+<<<<<<< HEAD
 const { normalizeReferralCode, findReferrer } = require("../utils/referral");
+=======
+>>>>>>> origin/main
 
 const clientIp = (req) =>
   (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "";
@@ -62,12 +65,15 @@ exports.applyMerchantController = asyncHandler(async (req, res) => {
     if (!isValidNid(nidNumber)) return apiResponse(res, 400, messages.nidInvalid);
     const nidHash = hashNid(nidNumber);
 
+<<<<<<< HEAD
     // From a referral link (or typed). Optional, but a code that matches no
     // merchant is refused so a typo cannot silently lose the referral.
     const referralCode = normalizeReferralCode(body.referralCode);
     const referrer = referralCode ? await findReferrer(referralCode) : null;
     if (referralCode && !referrer) return apiResponse(res, 400, messages.referralCodeInvalid);
 
+=======
+>>>>>>> origin/main
     const nidFrontFile = req.files?.nidFront?.[0];
     const nidBackFile = req.files?.nidBack?.[0];
     if (!nidFrontFile || !nidBackFile) return apiResponse(res, 400, messages.nidImagesRequired);
@@ -104,8 +110,11 @@ exports.applyMerchantController = asyncHandler(async (req, res) => {
       duplicateNid: duplicateOf.length > 0,
       duplicateOf,
       nidCheck: { status: nidCheck.status },
+<<<<<<< HEAD
       referralCode: referrer ? referralCode : "",
       referredBy: referrer?._id || null,
+=======
+>>>>>>> origin/main
       ipAddress: clientIp(req),
     });
 

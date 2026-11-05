@@ -6,4 +6,8 @@ node_modules/
 npm-debug.log*
 .DS_Store
 coverage/
+<<<<<<< HEAD
 node_modules/
+=======
+
+>>>>>>> origin/main

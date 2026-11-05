@@ -4,6 +4,7 @@ const { preventDeletion } = require("../utils/retention");
 
 const { Schema } = mongoose;
 
+<<<<<<< HEAD
 // "bank" and "other" remain for proofs submitted before payments were limited
 // to bKash and Nagad. "credit" is a proof paid entirely with referral credit.
 const PAYMENT_METHODS = ["bkash", "nagad", "bank", "other", "credit"];
@@ -17,6 +18,9 @@ const CASH_METHODS = ["bkash", "nagad"];
  * (utils/billing.js) so periods, credit and referrals behave identically.
  */
 const PAYMENT_CHANNELS = ["manual", "gateway"];
+=======
+const PAYMENT_METHODS = ["bkash", "nagad", "bank", "other"];
+>>>>>>> origin/main
 
 /**
  * Status:
@@ -30,16 +34,20 @@ const PAYMENT_CHANNELS = ["manual", "gateway"];
  */
 const SUBMISSION_STATUSES = ["pending", "approved", "activated", "rejected"];
 
+<<<<<<< HEAD
 function isCashPayment() {
   return this.method !== "credit";
 }
 
+=======
+>>>>>>> origin/main
 /** A merchant's proof that they paid their subscription, waiting for verification. */
 const paymentSubmissionSchema = new Schema(
   {
     merchant: { type: Schema.Types.ObjectId, ref: "Merchant", required: true, index: true },
     submittedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
 
+<<<<<<< HEAD
     channel: { type: String, enum: PAYMENT_CHANNELS, default: "manual" },
     method: { type: String, enum: PAYMENT_METHODS, required: true },
     methodOther: { type: String, trim: true, default: "" },
@@ -51,10 +59,18 @@ const paymentSubmissionSchema = new Schema(
     paidAt: { type: Date, default: null },
     // Upper-cased and stripped of spaces, so the same ID typed twice still matches.
     transactionId: { type: String, required: isCashPayment, trim: true, default: "", index: true },
+=======
+    method: { type: String, enum: PAYMENT_METHODS, required: true },
+    methodOther: { type: String, trim: true, default: "" },
+    amount: { type: Number, required: true, min: 1 },
+    // Upper-cased and stripped of spaces, so the same ID typed twice still matches.
+    transactionId: { type: String, required: true, trim: true, index: true },
+>>>>>>> origin/main
     // Same as `transactionId` while the proof is live, and removed when it is
     // rejected. A unique index on it means the database itself refuses a
     // second live proof with the same ID, even from two requests at once.
     transactionKey: { type: String },
+<<<<<<< HEAD
     // The invoice when they submitted: the monthly fee, the referral credit
     // reserved against it, and what was left to pay in cash (`expectedAmount`,
     // compared with `amount`).
@@ -62,6 +78,11 @@ const paymentSubmissionSchema = new Schema(
     creditApplied: { type: Number, min: 0, default: 0 },
     expectedAmount: { type: Number, default: 0 },
     screenshot: { type: attachmentSchema, required: isCashPayment },
+=======
+    // The merchant's monthly fee when they submitted, to compare with `amount`.
+    expectedAmount: { type: Number, default: 0 },
+    screenshot: { type: attachmentSchema, required: true },
+>>>>>>> origin/main
     message: { type: String, trim: true, default: "" },
 
     status: { type: String, enum: SUBMISSION_STATUSES, default: "pending", index: true },
@@ -88,8 +109,11 @@ preventDeletion(paymentSubmissionSchema, "PaymentSubmission");
 
 const PaymentSubmission = mongoose.model("PaymentSubmission", paymentSubmissionSchema);
 PaymentSubmission.PAYMENT_METHODS = PAYMENT_METHODS;
+<<<<<<< HEAD
 PaymentSubmission.CASH_METHODS = CASH_METHODS;
 PaymentSubmission.PAYMENT_CHANNELS = PAYMENT_CHANNELS;
+=======
+>>>>>>> origin/main
 PaymentSubmission.SUBMISSION_STATUSES = SUBMISSION_STATUSES;
 
 module.exports = PaymentSubmission;
